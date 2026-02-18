@@ -67,11 +67,11 @@ export default function CTA() {
                                 Hit profit targets while managing drawdown limits to demonstrate reliable risk management.
                             </p>
 
-                            <div className="h-32 rounded-2xl overflow-hidden relative">
+                            <div className="h-40 overflow-hidden relative">
                                 <img
                                     src="/trading-objectives.png"
                                     alt="Trading objectives preview"
-                                    className="absolute inset-x-0 bottom-0 w-full h-full object-contain object-bottom block"
+                                    className="absolute inset-0 w-full h-full object-cover object-center block scale-110"
                                 />
                             </div>
                         </div>
@@ -89,11 +89,11 @@ export default function CTA() {
                                 Once you qualify, receive performance-based payouts fast — with processing in as little as 24 hours.
                             </p>
 
-                            <div className="h-32 rounded-2xl overflow-hidden relative">
+                            <div className="h-40 overflow-hidden relative">
                                 <img
                                     src="/nairatradercerts.svg"
                                     alt="NairaTrader certificate preview"
-                                    className="absolute inset-x-0 bottom-0 w-full h-full object-contain object-bottom block"
+                                    className="absolute inset-0 w-full h-full object-cover object-center block scale-110"
                                 />
                             </div>
                         </div>
