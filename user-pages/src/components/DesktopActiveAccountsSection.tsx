@@ -1,7 +1,12 @@
 import React from 'react'
 import DesktopAccountCard from './DesktopAccountCard'
+import type { UserChallengeAccountListItem } from '../lib/auth'
 
-const DesktopActiveAccountsSection: React.FC = () => {
+type DesktopActiveAccountsSectionProps = {
+  accounts: UserChallengeAccountListItem[]
+}
+
+const DesktopActiveAccountsSection: React.FC<DesktopActiveAccountsSectionProps> = ({ accounts }) => {
   return (
     <div style={{
       marginBottom: '48px'
@@ -19,20 +24,21 @@ const DesktopActiveAccountsSection: React.FC = () => {
         flexDirection: 'column',
         gap: '16px'
       }}>
-        <DesktopAccountCard
-          phase="Phase 1"
-          accountNumber="12345678"
-          startDate="15 Jan 2024"
-          amount="N25,000"
-          status="Active"
-        />
-        <DesktopAccountCard
-          phase="Phase 2"
-          accountNumber="87654321"
-          startDate="20 Feb 2024"
-          amount="N50,000"
-          status="Active"
-        />
+        {accounts.length === 0 ? (
+          <div style={{ background: 'white', border: '1px solid #e0e0e0', borderRadius: '12px', padding: '20px', color: '#666' }}>
+            No active account yet.
+          </div>
+        ) : accounts.map((account) => (
+          <DesktopAccountCard
+            key={account.challenge_id}
+            challengeId={account.challenge_id}
+            phase={account.phase}
+            accountNumber={account.mt5_account ?? 'Pending'}
+            startDate={account.started_at ? new Date(account.started_at).toLocaleDateString() : '-'}
+            amount={account.account_size}
+            status={(account.display_status as 'Active' | 'Ready' | 'Passed' | 'Failed')}
+          />
+        ))}
       </div>
     </div>
   )

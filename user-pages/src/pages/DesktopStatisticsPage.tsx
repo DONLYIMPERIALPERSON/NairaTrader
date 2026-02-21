@@ -1,10 +1,61 @@
-import React from 'react'
+import React, { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import DesktopHeader from '../components/DesktopHeader'
 import DesktopSidebar from '../components/DesktopSidebar'
 import DesktopFooter from '../components/DesktopFooter'
+import { fetchUserChallengeAccountDetail, type UserChallengeAccountDetailResponse } from '../lib/auth'
 import '../styles/DesktopStatisticsPage.css'
 
 const DesktopStatisticsPage: React.FC = () => {
+  const [searchParams] = useSearchParams()
+  const [accountData, setAccountData] = useState<UserChallengeAccountDetailResponse | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  const challengeId = searchParams.get('challenge_id')
+
+  useEffect(() => {
+    if (!challengeId) {
+      setError('Challenge ID is required')
+      setLoading(false)
+      return
+    }
+
+    setLoading(true)
+    setError('')
+    fetchUserChallengeAccountDetail(challengeId)
+      .then((data) => {
+        setAccountData(data)
+      })
+      .catch((err: unknown) => {
+        setError(err instanceof Error ? err.message : 'Failed to load account details')
+      })
+      .finally(() => setLoading(false))
+  }, [challengeId])
+
+  if (loading) {
+    return (
+      <div className="desktop-statistics-page">
+        <DesktopHeader />
+        <DesktopSidebar />
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', color: 'white' }}>
+          Loading account details...
+        </div>
+      </div>
+    )
+  }
+
+  if (error || !accountData) {
+    return (
+      <div className="desktop-statistics-page">
+        <DesktopHeader />
+        <DesktopSidebar />
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', color: '#ff8b8b' }}>
+          {error || 'Account not found'}
+        </div>
+      </div>
+    )
+  }
   return (
     <div className="desktop-statistics-page">
       <DesktopHeader />
@@ -46,11 +97,11 @@ const DesktopStatisticsPage: React.FC = () => {
                 Win Rate
               </div>
               <div className="card-value">
-                78<span className="percentage">%</span>
+                {Math.round(accountData.metrics.win_rate * 100)}<span className="percentage">%</span>
               </div>
               <div className="card-change">
-                <i className="fas fa-arrow-up"></i>
-                +12% vs last month
+                <i className="fas fa-chart-line"></i>
+                Overall performance
               </div>
             </div>
             <div className="performance-card">
@@ -58,10 +109,10 @@ const DesktopStatisticsPage: React.FC = () => {
                 <i className="fas fa-arrow-right-arrow-left"></i>
                 No. of trades
               </div>
-              <div className="card-value">143</div>
+              <div className="card-value">{accountData.metrics.closed_trades_count}</div>
               <div className="card-change neutral">
                 <i className="fas fa-clock"></i>
-                since 1 Jan
+                Total trades
               </div>
             </div>
           </div>
@@ -85,46 +136,19 @@ const DesktopStatisticsPage: React.FC = () => {
           {/* Table Rows */}
           <div className="table-rows">
             <div className="table-row">
-              <span className="table-cell">Mon 10 Feb</span>
-              <span className="table-cell">3</span>
-              <span className="table-cell">0.45</span>
-              <span className="result-cell positive">
-                <i className="fas fa-plus-circle"></i>
-                +$240
-              </span>
-            </div>
-            <div className="table-row">
-              <span className="table-cell">Tue 11 Feb</span>
-              <span className="table-cell">5</span>
-              <span className="table-cell">0.92</span>
-              <span className="result-cell negative">
-                <i className="fas fa-minus-circle"></i>
-                -$127
-              </span>
-            </div>
-            <div className="table-row">
-              <span className="table-cell">Wed 12 Feb</span>
-              <span className="table-cell">2</span>
-              <span className="table-cell">0.30</span>
-              <span className="result-cell positive">
-                <i className="fas fa-plus-circle"></i>
-                +$89
-              </span>
-            </div>
-            <div className="table-row">
-              <span className="table-cell">Thu 13 Feb</span>
-              <span className="table-cell">4</span>
-              <span className="table-cell">0.78</span>
-              <span className="result-cell neutral">
-                <i className="fas fa-minus"></i>
-                $0.00
+              <span className="table-cell">{new Date().toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}</span>
+              <span className="table-cell">{accountData.metrics.today_trades_count}</span>
+              <span className="table-cell">{accountData.metrics.today_lots_total.toFixed(2)}</span>
+              <span className={`result-cell ${accountData.metrics.today_closed_pnl >= 0 ? 'positive' : 'negative'}`}>
+                <i className={`fas fa-${accountData.metrics.today_closed_pnl >= 0 ? 'plus' : 'minus'}-circle`}></i>
+                {accountData.metrics.today_closed_pnl >= 0 ? '+' : ''}N{accountData.metrics.today_closed_pnl.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
             </div>
           </div>
 
           <div className="table-footer">
             <span>
-              <i className="fas fa-regular fa-circle"></i> last 4 trading days
+              <i className="fas fa-regular fa-circle"></i> today's trading activity
             </span>
           </div>
         </div>

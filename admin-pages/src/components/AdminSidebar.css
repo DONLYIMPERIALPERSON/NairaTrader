@@ -74,6 +74,21 @@
   color: #fff;
 }
 
+.admin-sidebar-logout {
+  width: 100%;
+  text-align: left;
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.45);
+  color: #fecaca;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-weight: 600;
+}
+
+.admin-sidebar-logout:hover {
+  background: rgba(239, 68, 68, 0.2);
+}
+
 @media (max-width: 900px) {
   .admin-sidebar {
     position: static;

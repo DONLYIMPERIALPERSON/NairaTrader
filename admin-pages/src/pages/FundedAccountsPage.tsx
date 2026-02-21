@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { AdminUser } from './UsersPage'
+import { fetchFundedChallengeAccounts, type ChallengeAccountListItem } from '../lib/adminAuth'
 
 interface FundedAccountsPageProps {
   onOpenProfile: (user: AdminUser) => void
@@ -8,16 +9,28 @@ interface FundedAccountsPageProps {
 const FundedAccountsPage = ({ onOpenProfile }: FundedAccountsPageProps) => {
   const [leaderboardPage, setLeaderboardPage] = useState(1)
   const [fundedListPage, setFundedListPage] = useState(1)
+  const [fundedAccounts, setFundedAccounts] = useState<ChallengeAccountListItem[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
   const leaderboardPageSize = 3
   const fundedListPageSize = 10
 
-  const fundedAccounts = [
-    { accountId: 'FD-10422', trader: 'Chinedu A.', size: '₦1.5m', mt5: '20481200', phase: 'Funded', pnl: '+₦2,480,000' },
-    { accountId: 'FD-10407', trader: 'Fatima S.', size: '₦800k', mt5: '20480842', phase: 'Funded', pnl: '+₦2,120,000' },
-    { accountId: 'FD-10398', trader: 'Tunde O.', size: '₦1.5m', mt5: '20480210', phase: 'Funded', pnl: '+₦1,920,000' },
-    { accountId: 'FD-10384', trader: 'Grace O.', size: '₦600k', mt5: '20479908', phase: 'Funded', pnl: '+₦1,540,000' },
-    { accountId: 'FD-10370', trader: 'Favour M.', size: '₦400k', mt5: '20479241', phase: 'Funded', pnl: '+₦1,120,000' },
-  ]
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true)
+      setError('')
+      try {
+        const response = await fetchFundedChallengeAccounts()
+        setFundedAccounts(response.accounts)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load funded accounts')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    void load()
+  }, [])
 
   const topTraders = [
     { rank: 1, trader: 'Chinedu A.', accountSize: '₦1.5m', profit: '+₦2,480,000', winRate: '74%' },
@@ -49,7 +62,7 @@ const FundedAccountsPage = ({ onOpenProfile }: FundedAccountsPageProps) => {
     return topTraders.slice(start, start + leaderboardPageSize)
   }, [topTraders, leaderboardPage])
 
-  const totalFundedPages = Math.ceil(fundedAccounts.length / fundedListPageSize)
+  const totalFundedPages = Math.max(1, Math.ceil(fundedAccounts.length / fundedListPageSize))
   const paginatedFundedAccounts = useMemo(() => {
     const start = (fundedListPage - 1) * fundedListPageSize
     return fundedAccounts.slice(start, start + fundedListPageSize)
@@ -70,7 +83,7 @@ const FundedAccountsPage = ({ onOpenProfile }: FundedAccountsPageProps) => {
       </div>
 
       <div className="admin-table-card">
-        <h3 style={{ color: '#fff' }}>Top 10 Profitable Traders</h3>
+        <h3 style={{ color: '#fff', margin: 0, padding: '14px 16px 8px' }}>Top 10 Profitable Traders</h3>
         <table className="admin-table">
           <thead>
             <tr>
@@ -100,8 +113,17 @@ const FundedAccountsPage = ({ onOpenProfile }: FundedAccountsPageProps) => {
           </tbody>
         </table>
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '12px' }}>
-          <small style={{ color: '#fff' }}>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginTop: '12px',
+            padding: '0 16px 16px',
+            gap: 12,
+          }}
+        >
+          <small style={{ color: '#d1d5db', fontWeight: 600 }}>
             Showing {(leaderboardPage - 1) * leaderboardPageSize + 1} - {Math.min(leaderboardPage * leaderboardPageSize, topTraders.length)} of {topTraders.length}
           </small>
           <div style={{ display: 'flex', gap: '8px' }}>
@@ -109,6 +131,16 @@ const FundedAccountsPage = ({ onOpenProfile }: FundedAccountsPageProps) => {
               type="button"
               onClick={() => setLeaderboardPage((prev) => Math.max(prev - 1, 1))}
               disabled={leaderboardPage === 1}
+              style={{
+                border: '1px solid #2a2f3a',
+                background: '#151a22',
+                color: '#e5e7eb',
+                borderRadius: 10,
+                padding: '6px 12px',
+                fontWeight: 700,
+                cursor: leaderboardPage === 1 ? 'not-allowed' : 'pointer',
+                opacity: leaderboardPage === 1 ? 0.5 : 1,
+              }}
             >
               Prev
             </button>
@@ -116,6 +148,16 @@ const FundedAccountsPage = ({ onOpenProfile }: FundedAccountsPageProps) => {
               type="button"
               onClick={() => setLeaderboardPage((prev) => Math.min(prev + 1, totalLeaderboardPages))}
               disabled={leaderboardPage === totalLeaderboardPages}
+              style={{
+                border: '1px solid #2a2f3a',
+                background: '#151a22',
+                color: '#e5e7eb',
+                borderRadius: 10,
+                padding: '6px 12px',
+                fontWeight: 700,
+                cursor: leaderboardPage === totalLeaderboardPages ? 'not-allowed' : 'pointer',
+                opacity: leaderboardPage === totalLeaderboardPages ? 0.5 : 1,
+              }}
             >
               Next
             </button>
@@ -124,7 +166,9 @@ const FundedAccountsPage = ({ onOpenProfile }: FundedAccountsPageProps) => {
       </div>
 
       <div className="admin-table-card">
-        <h3 style={{ color: '#fff' }}>Funded Accounts List</h3>
+        <h3 style={{ color: '#fff', margin: 0, padding: '14px 16px 8px' }}>Funded Accounts List</h3>
+        {loading && <p style={{ color: '#9ca3af', margin: 0, padding: '2px 16px 10px' }}>Loading funded accounts...</p>}
+        {!loading && error && <p style={{ color: '#fca5a5', margin: 0, padding: '2px 16px 10px' }}>{error}</p>}
         <table className="admin-table">
           <thead>
             <tr>
@@ -138,33 +182,60 @@ const FundedAccountsPage = ({ onOpenProfile }: FundedAccountsPageProps) => {
             </tr>
           </thead>
           <tbody>
-            {paginatedFundedAccounts.map((row) => (
-              <tr key={row.accountId}>
-                <td>{row.accountId}</td>
-                <td>{row.trader}</td>
-                <td>{row.size}</td>
-                <td>{row.mt5}</td>
-                <td>{row.phase}</td>
-                <td>{row.pnl}</td>
-                <td>
-                  <button type="button" onClick={() => openProfileFromName(row.trader, row.pnl)}>
-                    View Profile
-                  </button>
+            {paginatedFundedAccounts.length === 0 ? (
+              <tr>
+                <td colSpan={7} style={{ textAlign: 'center', color: '#9ca3af' }}>
+                  No funded accounts yet.
                 </td>
               </tr>
-            ))}
+            ) : (
+              paginatedFundedAccounts.map((row) => (
+                <tr key={row.challenge_id}>
+                  <td>{row.challenge_id}</td>
+                  <td>{row.trader_name ?? `User ${row.user_id}`}</td>
+                  <td>{row.account_size}</td>
+                  <td>{row.mt5_account ?? '-'}</td>
+                  <td>{row.phase}</td>
+                  <td>+₦0 (dummy)</td>
+                  <td>
+                    <button type="button" onClick={() => openProfileFromName(row.trader_name ?? `User ${row.user_id}`, '+₦0 (dummy)')}>
+                      View Profile
+                    </button>
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '12px' }}>
-          <small style={{ color: '#fff' }}>
-            Showing {(fundedListPage - 1) * fundedListPageSize + 1} - {Math.min(fundedListPage * fundedListPageSize, fundedAccounts.length)} of {fundedAccounts.length}
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginTop: '12px',
+            padding: '0 16px 16px',
+            gap: 12,
+          }}
+        >
+          <small style={{ color: '#d1d5db', fontWeight: 600 }}>
+            Showing {fundedAccounts.length === 0 ? 0 : (fundedListPage - 1) * fundedListPageSize + 1} - {Math.min(fundedListPage * fundedListPageSize, fundedAccounts.length)} of {fundedAccounts.length}
           </small>
           <div style={{ display: 'flex', gap: '8px' }}>
             <button
               type="button"
               onClick={() => setFundedListPage((prev) => Math.max(prev - 1, 1))}
               disabled={fundedListPage === 1}
+              style={{
+                border: '1px solid #2a2f3a',
+                background: '#151a22',
+                color: '#e5e7eb',
+                borderRadius: 10,
+                padding: '6px 12px',
+                fontWeight: 700,
+                cursor: fundedListPage === 1 ? 'not-allowed' : 'pointer',
+                opacity: fundedListPage === 1 ? 0.5 : 1,
+              }}
             >
               Prev
             </button>
@@ -172,6 +243,16 @@ const FundedAccountsPage = ({ onOpenProfile }: FundedAccountsPageProps) => {
               type="button"
               onClick={() => setFundedListPage((prev) => Math.min(prev + 1, totalFundedPages))}
               disabled={fundedListPage === totalFundedPages}
+              style={{
+                border: '1px solid #2a2f3a',
+                background: '#151a22',
+                color: '#e5e7eb',
+                borderRadius: 10,
+                padding: '6px 12px',
+                fontWeight: 700,
+                cursor: fundedListPage === totalFundedPages ? 'not-allowed' : 'pointer',
+                opacity: fundedListPage === totalFundedPages ? 0.5 : 1,
+              }}
             >
               Next
             </button>

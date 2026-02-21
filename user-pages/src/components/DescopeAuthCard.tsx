@@ -20,6 +20,31 @@ type DescopeSuccessPayload = {
   }
 }
 
+function toSafeAuthErrorMessage(err: unknown): string {
+  if (err instanceof Error) {
+    const message = err.message.toLowerCase()
+
+    if (message.includes('failed to fetch') || message.includes('network')) {
+      return 'Network error. Please check your connection and try again.'
+    }
+
+    if (
+      message.includes('401')
+      || message.includes('unauthorized')
+      || message.includes('invalid')
+      || message.includes('authentication failed')
+    ) {
+      return 'Unable to sign in with those details. Please try again.'
+    }
+
+    if (message.includes('no descope session token')) {
+      return 'Your session has expired. Please try again.'
+    }
+  }
+
+  return 'Unable to sign in right now. Please try again shortly.'
+}
+
 const DescopeAuthCard: React.FC<DescopeAuthCardProps> = ({ title, subtitle }) => {
   const navigate = useNavigate()
   const [error, setError] = useState<string>('')
@@ -40,17 +65,14 @@ const DescopeAuthCard: React.FC<DescopeAuthCardProps> = ({ title, subtitle }) =>
     setInteractionLoading(false)
     setLoading(true)
 
-    // Navigate immediately after successful Descope auth to avoid perceived bounce.
-    // Backend sync happens in background and should not block dashboard entry.
-    navigate('/')
-
     try {
       const sessionJwt = event?.detail?.sessionJwt
       const user = await loginWithBackend(sessionJwt)
       persistAuthUser(user)
+      navigate('/')
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Authentication failed'
-      console.warn('Post-login backend sync failed:', message)
+      console.error('Login finalization failed', err)
+      setError(toSafeAuthErrorMessage(err))
     } finally {
       setLoading(false)
     }
@@ -58,10 +80,8 @@ const DescopeAuthCard: React.FC<DescopeAuthCardProps> = ({ title, subtitle }) =>
 
   const handleError = useCallback((event: unknown) => {
     setInteractionLoading(false)
-    const message = event && typeof event === 'object' && 'detail' in event
-      ? JSON.stringify((event as { detail: unknown }).detail)
-      : 'Descope flow error'
-    setError(message)
+    console.error('Descope flow error', event)
+    setError('Authentication failed. Please check your details and try again.')
   }, [])
 
   const onScreenUpdate = useCallback((incomingScreenName: string, context: Record<string, unknown>, next: FlowNextFn) => {
@@ -77,11 +97,15 @@ const DescopeAuthCard: React.FC<DescopeAuthCardProps> = ({ title, subtitle }) =>
     if (!nextAction) {
       return
     }
+    if (loading) {
+      return
+    }
     setInteractionLoading(true)
     nextAction(interactionId, form)
-  }, [nextAction])
+  }, [loading, nextAction])
 
-  const continueButtonText = interactionLoading ? 'Please wait...' : 'Continue'
+  const isBusy = interactionLoading || loading
+  const continueButtonText = isBusy ? 'Please wait...' : 'Continue'
 
   const renderCustomScreen = () => {
     switch (screenName) {
@@ -103,7 +127,7 @@ const DescopeAuthCard: React.FC<DescopeAuthCardProps> = ({ title, subtitle }) =>
             <button
               className="submit-button"
               type="button"
-              disabled={interactionLoading}
+              disabled={isBusy}
               onClick={() => submitInteraction('Ppb_65tyyn', { email })}
             >
               {continueButtonText}
@@ -131,10 +155,10 @@ const DescopeAuthCard: React.FC<DescopeAuthCardProps> = ({ title, subtitle }) =>
             <button
               className="submit-button"
               type="button"
-              disabled={interactionLoading}
+              disabled={isBusy}
               onClick={() => submitInteraction('pXVwWREG7M', { password })}
             >
-              {continueButtonText}
+              {loading ? 'Signing in...' : continueButtonText}
             </button>
 
             <p className="naira-auth-continue-note">Continue securely with your NairaTrader account.</p>
@@ -142,10 +166,10 @@ const DescopeAuthCard: React.FC<DescopeAuthCardProps> = ({ title, subtitle }) =>
             <button
               className="submit-button naira-auth-secondary-btn"
               type="button"
-              disabled={interactionLoading}
+              disabled={isBusy}
               onClick={() => submitInteraction('tZbr-2eP17')}
             >
-              {interactionLoading ? 'Please wait...' : 'Forgot password'}
+              {isBusy ? 'Please wait...' : 'Forgot password'}
             </button>
           </div>
         )
@@ -175,19 +199,19 @@ const DescopeAuthCard: React.FC<DescopeAuthCardProps> = ({ title, subtitle }) =>
             <button
               className="submit-button"
               type="button"
-              disabled={interactionLoading}
+              disabled={isBusy}
               onClick={() => submitInteraction('SgSm98sFRr', { code })}
             >
-              {interactionLoading ? 'Please wait...' : 'Verify code'}
+              {isBusy ? 'Please wait...' : 'Verify code'}
             </button>
 
             <button
               className="submit-button naira-auth-secondary-btn"
               type="button"
-              disabled={interactionLoading}
+              disabled={isBusy}
               onClick={() => submitInteraction('resend')}
             >
-              {interactionLoading ? 'Please wait...' : 'Send again'}
+              {isBusy ? 'Please wait...' : 'Send again'}
             </button>
           </div>
         )
@@ -223,7 +247,7 @@ const DescopeAuthCard: React.FC<DescopeAuthCardProps> = ({ title, subtitle }) =>
             <button
               className="submit-button"
               type="button"
-              disabled={interactionLoading}
+              disabled={isBusy}
               onClick={() => submitInteraction('n6WbbqzlwS', { newPassword, confirmPassword })}
             >
               {continueButtonText}
@@ -273,10 +297,10 @@ const DescopeAuthCard: React.FC<DescopeAuthCardProps> = ({ title, subtitle }) =>
             <button
               className="submit-button"
               type="button"
-              disabled={interactionLoading}
+              disabled={isBusy}
               onClick={() => submitInteraction('update-password', { password, newPassword, confirmPassword })}
             >
-              {interactionLoading ? 'Please wait...' : 'Update Password'}
+              {isBusy ? 'Please wait...' : 'Update Password'}
             </button>
           </div>
         )

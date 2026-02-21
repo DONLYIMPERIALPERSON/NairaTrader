@@ -13,8 +13,10 @@ def serialize_user(user: User) -> dict[str, str | int | None]:
         "descope_user_id": user.descope_user_id,
         "email": user.email,
         "full_name": user.full_name,
+        "nick_name": user.nick_name,
         "role": user.role,
         "status": user.status,
+        "kyc_status": user.kyc_status,
     }
 
 

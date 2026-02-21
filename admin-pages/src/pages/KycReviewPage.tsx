@@ -1,88 +1,109 @@
+import { useEffect, useState } from 'react'
+import { fetchAdminKycProfiles, type AdminKycProfileItem } from '../lib/adminAuth'
 import './KycReviewPage.css'
 import type { AdminUser } from './UsersPage'
-
-const kycRows = [
-  {
-    accountNumber: '10293847',
-    accountSize: '200k',
-    datePassed: '2026-02-04',
-    profitMilestone: 'Passed',
-    status: 'Auto Approved',
-    user: { name: 'Favour M.', email: 'favour@mail.com', accounts: '2 / 1', revenue: '₦1,280,000', orders: '6', payouts: '₦280,000' },
-  },
-  {
-    accountNumber: '10293855',
-    accountSize: '100k',
-    datePassed: '2026-02-10',
-    profitMilestone: 'Passed',
-    status: 'Auto Approved',
-    user: { name: 'Chinedu A.', email: 'chinedu@mail.com', accounts: '3 / 1', revenue: '₦2,940,000', orders: '11', payouts: '₦620,000' },
-  },
-  {
-    accountNumber: '10300661',
-    accountSize: '50k',
-    datePassed: '2026-02-12',
-    profitMilestone: 'Passed',
-    status: 'Auto Approved',
-    user: { name: 'Grace O.', email: 'grace@mail.com', accounts: '1 / 0', revenue: '₦490,000', orders: '2', payouts: '₦0' },
-  },
-]
 
 interface KycReviewPageProps {
   onOpenProfile: (user: AdminUser) => void
 }
 
 const KycReviewPage = ({ onOpenProfile }: KycReviewPageProps) => {
-  const allTimeSubmissions = 24892
-  const todaySubmissions = 1284
+  const [profiles, setProfiles] = useState<AdminKycProfileItem[]>([])
+  const [eligibleProfiles, setEligibleProfiles] = useState(0)
+  const [todayEligible, setTodayEligible] = useState(0)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true)
+      setError('')
+      try {
+        const response = await fetchAdminKycProfiles()
+        setProfiles(response.profiles)
+        setEligibleProfiles(response.stats.eligible_profiles)
+        setTodayEligible(response.stats.today_eligible)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load KYC profiles')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    void load()
+  }, [])
 
   return (
     <section className="admin-page-stack kyc-review-page">
       <div className="admin-dashboard-card">
         <h2>KYC Review</h2>
-        <p>Accounts that have passed KYC and crossed 10% profit milestone.</p>
+        <p>Profile-level KYC queue. A user becomes eligible once they own at least one funded account.</p>
       </div>
 
       <div className="kyc-review-stats">
         <article className="admin-dashboard-card">
-          <span>All-time Submissions</span>
-          <strong>{allTimeSubmissions.toLocaleString()}</strong>
+          <span>Eligible Profiles</span>
+          <strong>{eligibleProfiles.toLocaleString()}</strong>
         </article>
         <article className="admin-dashboard-card">
-          <span>Today's Submissions</span>
-          <strong>{todaySubmissions.toLocaleString()}</strong>
+          <span>Became Eligible Today</span>
+          <strong>{todayEligible.toLocaleString()}</strong>
         </article>
       </div>
 
       <div className="admin-table-card">
+        {loading && <p style={{ color: '#9ca3af', padding: '10px 16px', margin: 0 }}>Loading KYC profiles...</p>}
+        {!loading && error && <p style={{ color: '#fca5a5', padding: '10px 16px', margin: 0 }}>{error}</p>}
         <table className="admin-table">
           <thead>
             <tr>
-              <th>Account Number</th>
-              <th>Account Size</th>
-              <th>Date Passed</th>
-              <th>10% Profit Made</th>
+              <th>Profile</th>
+              <th>Email</th>
+              <th>Eligible Since</th>
+              <th>Funded Accounts</th>
+              <th>Total Challenge Accounts</th>
               <th>Status</th>
               <th>Action</th>
             </tr>
           </thead>
           <tbody>
-            {kycRows.map((row) => (
-              <tr key={row.accountNumber}>
-                <td>{row.accountNumber}</td>
-                <td>{row.accountSize}</td>
-                <td>{row.datePassed}</td>
-                <td>{row.profitMilestone}</td>
-                <td>
-                  <span className="kyc-status-pill">{row.status}</span>
-                </td>
-                <td>
-                  <button type="button" className="kyc-view-profile-btn" onClick={() => onOpenProfile(row.user)}>
-                    View Profile
-                  </button>
-                </td>
+            {profiles.length === 0 ? (
+              <tr>
+                <td colSpan={7} style={{ textAlign: 'center', color: '#9ca3af' }}>No KYC-eligible profiles yet.</td>
               </tr>
-            ))}
+            ) : (
+              profiles.map((row) => (
+                <tr key={row.user_id}>
+                  <td>{row.name}</td>
+                  <td>{row.email}</td>
+                  <td>{row.eligible_since ? new Date(row.eligible_since).toLocaleDateString() : '-'}</td>
+                  <td>{row.funded_accounts}</td>
+                  <td>{row.total_challenge_accounts}</td>
+                  <td>
+                    <span className="kyc-status-pill">{row.status}</span>
+                  </td>
+                  <td>
+                    <button
+                      type="button"
+                      className="kyc-view-profile-btn"
+                      onClick={() =>
+                        onOpenProfile({
+                          user_id: row.user_id,
+                          name: row.name,
+                          email: row.email,
+                          accounts: `${row.total_challenge_accounts} / ${row.funded_accounts}`,
+                          revenue: '₦0',
+                          orders: String(row.total_challenge_accounts),
+                          payouts: '₦0',
+                        })
+                      }
+                    >
+                      View Profile
+                    </button>
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>

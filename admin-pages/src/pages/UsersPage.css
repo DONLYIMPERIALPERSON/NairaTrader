@@ -83,7 +83,9 @@
 }
 
 .users-table-footer {
-  margin-top: 10px;
+  margin-top: 12px;
+  padding: 12px 16px 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
   display: flex;
   justify-content: space-between;
   align-items: center;

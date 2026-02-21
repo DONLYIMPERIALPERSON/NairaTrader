@@ -165,6 +165,18 @@
   cursor: pointer;
 }
 
+.desktop-coupon-error {
+  margin-top: 10px;
+  color: #e11d48;
+  font-size: 13px;
+}
+
+.desktop-coupon-success {
+  margin-top: 10px;
+  color: #15803d;
+  font-size: 13px;
+}
+
 .desktop-terms-placeholder {
   border: 1px dashed #e0e0e0;
   border-radius: 10px;
@@ -227,19 +239,36 @@
   align-items: center;
 }
 
-.desktop-method-logo-placeholder {
+.desktop-method-pill {
+  width: 100%;
+  max-width: 240px;
+  min-height: 48px;
+  border-radius: 10px;
+  border: 1px solid #e5e7eb;
+  background: #f8fafc;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 74px;
-  height: 28px;
-  border: 1px dashed #d6d6d6;
-  border-radius: 6px;
-  background: #fafafa;
-  color: #9a9a9a;
-  font-size: 11px;
+  gap: 8px;
+  padding: 10px 12px;
+  box-sizing: border-box;
+  color: #374151;
+}
+
+.desktop-method-pill i {
+  font-size: 14px;
+}
+
+.desktop-method-pill span {
+  font-size: 12px;
   font-weight: 600;
-  margin-right: 4px;
+  line-height: 1.1;
+}
+
+.desktop-radio-row input:checked + .desktop-method-pill {
+  border-color: #ffd700;
+  background: #fff9db;
+  color: #6b5200;
 }
 
 .desktop-checkout-continue {

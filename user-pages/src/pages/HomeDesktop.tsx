@@ -1,11 +1,47 @@
-import React from 'react'
+import React, { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import DesktopHeader from '../components/DesktopHeader'
 import DesktopSidebar from '../components/DesktopSidebar'
 import DesktopActiveAccountsSection from '../components/DesktopActiveAccountsSection'
 import DesktopHistorySection from '../components/DesktopHistorySection'
 import DesktopFooter from '../components/DesktopFooter'
+import { fetchUserChallengeAccounts, getPinStatus, type UserChallengeAccountListItem } from '../lib/auth'
 
 const HomeDesktop: React.FC = () => {
+  const navigate = useNavigate()
+  const [showPinPrompt, setShowPinPrompt] = useState(false)
+  const [loadingAccounts, setLoadingAccounts] = useState(true)
+  const [accountLoadError, setAccountLoadError] = useState('')
+  const [activeAccounts, setActiveAccounts] = useState<UserChallengeAccountListItem[]>([])
+  const [historyAccounts, setHistoryAccounts] = useState<UserChallengeAccountListItem[]>([])
+  const [hasAnyAccounts, setHasAnyAccounts] = useState(false)
+
+  useEffect(() => {
+    getPinStatus()
+      .then((status) => {
+        if (!status.has_pin) setShowPinPrompt(true)
+      })
+      .catch(() => {
+        // fallback: still show prompt so user can quickly set PIN from home
+        setShowPinPrompt(true)
+      })
+  }, [])
+
+  useEffect(() => {
+    setLoadingAccounts(true)
+    setAccountLoadError('')
+    fetchUserChallengeAccounts()
+      .then((res) => {
+        setActiveAccounts(res.active_accounts)
+        setHistoryAccounts(res.history_accounts)
+        setHasAnyAccounts(res.has_any_accounts)
+      })
+      .catch((err: unknown) => {
+        setAccountLoadError(err instanceof Error ? err.message : 'Unable to load accounts')
+      })
+      .finally(() => setLoadingAccounts(false))
+  }, [])
+
   return (
     <div style={{
       backgroundColor: '#f8f9fa',
@@ -76,15 +112,103 @@ const HomeDesktop: React.FC = () => {
           </button>
         </div>
 
-        {/* Active Accounts Section */}
-        <DesktopActiveAccountsSection />
+        {loadingAccounts ? (
+          <div style={{ background: 'white', border: '1px solid #e0e0e0', borderRadius: '12px', padding: '20px', color: '#666' }}>
+            Loading accounts...
+          </div>
+        ) : accountLoadError ? (
+          <div style={{ background: 'white', border: '1px solid #f1b0b7', borderRadius: '12px', padding: '20px', color: '#721c24' }}>
+            {accountLoadError}
+          </div>
+        ) : !hasAnyAccounts ? (
+          <div style={{ background: 'white', border: '1px solid #e0e0e0', borderRadius: '12px', padding: '32px' }}>
+            <h3 style={{ margin: 0, color: '#333' }}>No account yet</h3>
+            <p style={{ marginTop: '10px', color: '#666' }}>You have not started any challenge account yet.</p>
+            <button
+              onClick={() => navigate('/trading-accounts')}
+              style={{
+                marginTop: '16px',
+                backgroundColor: '#FFD700',
+                border: 'none',
+                borderRadius: '8px',
+                padding: '10px 16px',
+                cursor: 'pointer',
+                fontWeight: 600,
+                color: '#333'
+              }}
+            >
+              Start New Challenge
+            </button>
+          </div>
+        ) : (
+          <>
+            {/* Active Accounts Section */}
+            <DesktopActiveAccountsSection accounts={activeAccounts} />
 
-        {/* History Section */}
-        <DesktopHistorySection />
+            {/* History Section */}
+            <DesktopHistorySection accounts={historyAccounts} />
+
+            {activeAccounts.length === 0 && (
+              <div style={{ background: 'white', border: '1px solid #e0e0e0', borderRadius: '12px', padding: '24px', marginTop: '24px' }}>
+                <h3 style={{ margin: 0, color: '#333' }}>No active account</h3>
+                <p style={{ marginTop: '10px', color: '#666' }}>
+                  You currently have no active challenge account. Your history is still available above.
+                </p>
+                <button
+                  onClick={() => navigate('/trading-accounts')}
+                  style={{
+                    marginTop: '16px',
+                    backgroundColor: '#FFD700',
+                    border: 'none',
+                    borderRadius: '8px',
+                    padding: '10px 16px',
+                    cursor: 'pointer',
+                    fontWeight: 600,
+                    color: '#333'
+                  }}
+                >
+                  Start New Challenge
+                </button>
+              </div>
+            )}
+          </>
+        )}
       </div>
 
       {/* Footer */}
       <DesktopFooter />
+
+      {showPinPrompt && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0,0,0,0.45)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 3000,
+          padding: '16px',
+        }}>
+          <div style={{ background: '#fff', width: '100%', maxWidth: '460px', borderRadius: '12px', padding: '20px' }}>
+            <h3 style={{ margin: 0, color: '#222' }}>Set PIN Required</h3>
+            <p style={{ color: '#555', marginTop: '10px' }}>
+              For faster and secure actions, please set your transaction PIN now.
+            </p>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '16px' }}>
+              <button onClick={() => setShowPinPrompt(false)} style={{ padding: '10px 14px', borderRadius: '8px', border: '1px solid #ddd', background: '#fff', cursor: 'pointer' }}>Later</button>
+              <button
+                onClick={() => {
+                  setShowPinPrompt(false)
+                  navigate('/settings')
+                }}
+                style={{ padding: '10px 14px', borderRadius: '8px', border: 'none', background: '#FFD700', cursor: 'pointer', fontWeight: 600 }}
+              >
+                Set PIN Now
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -1,192 +1,150 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { AdminUser } from './UsersPage'
+import { fetchChallengeAccounts, type ChallengeAccountListItem } from '../lib/adminAuth'
 
 interface AccountsPageProps {
   onOpenProfile: (user: AdminUser) => void
 }
 
+type StatsWindow = 'today' | 'week' | 'month'
+
 const AccountsPage = ({ onOpenProfile }: AccountsPageProps) => {
   const [currentPage, setCurrentPage] = useState(1)
+  const [rows, setRows] = useState<ChallengeAccountListItem[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [statsWindow, setStatsWindow] = useState<StatsWindow>('today')
   const rowsPerPage = 10
 
-  const challengeRows = [
-    {
-      challengeId: 'CH-92811',
-      trader: 'Favour M.',
-      accountSize: '₦200k',
-      mt5Account: '10293847',
-      mt5Server: 'MT5-Live-01',
-      mt5Password: 'FV@4471',
-      phase: 'Phase 1',
-      currentPnl: '+₦320,000',
-    },
-    {
-      challengeId: 'CH-93220',
-      trader: 'Chinedu A.',
-      accountSize: '₦400k',
-      mt5Account: '10293855',
-      mt5Server: 'MT5-Live-01',
-      mt5Password: 'CN@7722',
-      phase: 'Phase 2',
-      currentPnl: '+₦112,000',
-    },
-    {
-      challengeId: 'CH-93602',
-      trader: 'Grace O.',
-      accountSize: '₦600k',
-      mt5Account: '10300661',
-      mt5Server: 'MT5-Live-02',
-      mt5Password: 'GR@1198',
-      phase: 'Phase 2',
-      currentPnl: '+₦540,000',
-    },
-    {
-      challengeId: 'CH-94041',
-      trader: 'David E.',
-      accountSize: '₦800k',
-      mt5Account: '10311409',
-      mt5Server: 'MT5-Live-01',
-      mt5Password: 'DV@9001',
-      phase: 'Phase 1',
-      currentPnl: '+₦76,000',
-    },
-    {
-      challengeId: 'CH-94122',
-      trader: 'Joy K.',
-      accountSize: '₦1.5m',
-      mt5Account: '10311872',
-      mt5Server: 'MT5-Live-02',
-      mt5Password: 'JY@5512',
-      phase: 'Phase 2',
-      currentPnl: '+₦280,000',
-    },
-    {
-      challengeId: 'CH-94211',
-      trader: 'Ibrahim L.',
-      accountSize: '₦200k',
-      mt5Account: '10312230',
-      mt5Server: 'MT5-Live-01',
-      mt5Password: 'IB@7410',
-      phase: 'Phase 1',
-      currentPnl: '+₦40,000',
-    },
-    {
-      challengeId: 'CH-94308',
-      trader: 'Amina Y.',
-      accountSize: '₦400k',
-      mt5Account: '10312848',
-      mt5Server: 'MT5-Live-01',
-      mt5Password: 'AM@2228',
-      phase: 'Phase 2',
-      currentPnl: '+₦199,000',
-    },
-    {
-      challengeId: 'CH-94410',
-      trader: 'Samuel P.',
-      accountSize: '₦600k',
-      mt5Account: '10313284',
-      mt5Server: 'MT5-Live-02',
-      mt5Password: 'SM@6642',
-      phase: 'Phase 1',
-      currentPnl: '+₦61,500',
-    },
-    {
-      challengeId: 'CH-94551',
-      trader: 'Ngozi R.',
-      accountSize: '₦800k',
-      mt5Account: '10313941',
-      mt5Server: 'MT5-Live-02',
-      mt5Password: 'NG@1704',
-      phase: 'Phase 1',
-      currentPnl: '+₦143,000',
-    },
-    {
-      challengeId: 'CH-94677',
-      trader: 'Tunde O.',
-      accountSize: '₦1.5m',
-      mt5Account: '10314521',
-      mt5Server: 'MT5-Live-01',
-      mt5Password: 'TD@1881',
-      phase: 'Phase 2',
-      currentPnl: '+₦390,000',
-    },
-    {
-      challengeId: 'CH-94763',
-      trader: 'Blessing N.',
-      accountSize: '₦200k',
-      mt5Account: '10315104',
-      mt5Server: 'MT5-Live-02',
-      mt5Password: 'BL@6033',
-      phase: 'Phase 1',
-      currentPnl: '+₦84,000',
-    },
-    {
-      challengeId: 'CH-94801',
-      trader: 'Kelvin D.',
-      accountSize: '₦400k',
-      mt5Account: '10315672',
-      mt5Server: 'MT5-Live-01',
-      mt5Password: 'KV@3200',
-      phase: 'Phase 2',
-      currentPnl: '+₦255,000',
-    },
-    {
-      challengeId: 'CH-94952',
-      trader: 'Ruth S.',
-      accountSize: '₦600k',
-      mt5Account: '10316210',
-      mt5Server: 'MT5-Live-01',
-      mt5Password: 'RT@7880',
-      phase: 'Phase 1',
-      currentPnl: '+₦92,500',
-    },
-  ]
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true)
+      setError('')
+      try {
+        const response = await fetchChallengeAccounts()
+        setRows(response.accounts)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load challenge accounts')
+      } finally {
+        setLoading(false)
+      }
+    }
 
-  const totalPages = Math.ceil(challengeRows.length / rowsPerPage)
+    void load()
+  }, [])
+
+  const totalPages = Math.max(1, Math.ceil(rows.length / rowsPerPage))
   const paginatedRows = useMemo(() => {
     const startIndex = (currentPage - 1) * rowsPerPage
-    return challengeRows.slice(startIndex, startIndex + rowsPerPage)
-  }, [challengeRows, currentPage])
+    return rows.slice(startIndex, startIndex + rowsPerPage)
+  }, [rows, currentPage])
+
+  const inWindow = (iso: string | null | undefined) => {
+    if (!iso) return false
+    const target = new Date(iso)
+    if (Number.isNaN(target.getTime())) return false
+    const now = new Date()
+
+    if (statsWindow === 'today') {
+      return target.toDateString() === now.toDateString()
+    }
+
+    if (statsWindow === 'week') {
+      const day = now.getDay()
+      const mondayOffset = day === 0 ? -6 : 1 - day
+      const startOfWeek = new Date(now)
+      startOfWeek.setDate(now.getDate() + mondayOffset)
+      startOfWeek.setHours(0, 0, 0, 0)
+      return target >= startOfWeek
+    }
+
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+    return target >= startOfMonth
+  }
+
+  const activeChallengesCount = rows.filter((row) => row.objective_status === 'active').length
+  const breachedCountForWindow = rows.filter((row) => row.objective_status === 'breached' && inWindow(row.breached_at)).length
+  const passedCountForWindow = rows.filter((row) => row.objective_status === 'passed' && inWindow(row.passed_at)).length
+  const statsWindowLabel = statsWindow === 'today' ? 'Today' : statsWindow === 'week' ? 'This Week' : 'This Month'
 
   return (
     <section className="admin-page-stack">
       <div className="admin-dashboard-card">
-        <h2>Challenges</h2>
-        <p>Track challenge performance, breaches, passes, and MT5 details for each challenge account.</p>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+          <div>
+            <h2 style={{ marginBottom: 8 }}>Challenges</h2>
+            <p style={{ margin: 0 }}>Track challenge performance, breaches, passes, and MT5 details for each challenge account.</p>
+          </div>
+
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              onClick={() => setStatsWindow('today')}
+              style={{
+                border: '1px solid #2a2f3a',
+                borderRadius: 10,
+                padding: '8px 12px',
+                fontWeight: 700,
+                color: statsWindow === 'today' ? '#111827' : '#d1d5db',
+                background: statsWindow === 'today' ? '#f59e0b' : '#111827',
+                cursor: 'pointer',
+              }}
+            >
+              Today
+            </button>
+            <button
+              type="button"
+              onClick={() => setStatsWindow('week')}
+              style={{
+                border: '1px solid #2a2f3a',
+                borderRadius: 10,
+                padding: '8px 12px',
+                fontWeight: 700,
+                color: statsWindow === 'week' ? '#111827' : '#d1d5db',
+                background: statsWindow === 'week' ? '#f59e0b' : '#111827',
+                cursor: 'pointer',
+              }}
+            >
+              This Week
+            </button>
+            <button
+              type="button"
+              onClick={() => setStatsWindow('month')}
+              style={{
+                border: '1px solid #2a2f3a',
+                borderRadius: 10,
+                padding: '8px 12px',
+                fontWeight: 700,
+                color: statsWindow === 'month' ? '#111827' : '#d1d5db',
+                background: statsWindow === 'month' ? '#f59e0b' : '#111827',
+                cursor: 'pointer',
+              }}
+            >
+              This Month
+            </button>
+          </div>
+        </div>
       </div>
 
       <div className="admin-kpi-grid">
         <article className="admin-kpi-card">
           <h3>Active Challenges</h3>
-          <strong>1,392</strong>
+          <strong>{activeChallengesCount}</strong>
         </article>
         <article className="admin-kpi-card">
-          <h3>Breached Today</h3>
-          <strong>12</strong>
+          <h3>Breached ({statsWindowLabel})</h3>
+          <strong>{breachedCountForWindow}</strong>
         </article>
         <article className="admin-kpi-card">
-          <h3>Breached This Week</h3>
-          <strong>61</strong>
-        </article>
-        <article className="admin-kpi-card">
-          <h3>Breached This Month</h3>
-          <strong>214</strong>
-        </article>
-        <article className="admin-kpi-card">
-          <h3>Passed Today</h3>
-          <strong>8</strong>
-        </article>
-        <article className="admin-kpi-card">
-          <h3>Passed This Week</h3>
-          <strong>37</strong>
-        </article>
-        <article className="admin-kpi-card">
-          <h3>Passed This Month</h3>
-          <strong>146</strong>
+          <h3>Passed ({statsWindowLabel})</h3>
+          <strong>{passedCountForWindow}</strong>
         </article>
       </div>
 
       <div className="admin-table-card">
+        {loading && <p style={{ color: '#9ca3af', padding: '12px 16px 10px', margin: 0 }}>Loading challenge accounts...</p>}
+        {!loading && error && <p style={{ color: '#fca5a5', padding: '12px 16px 10px', margin: 0 }}>{error}</p>}
+
         <table className="admin-table">
           <thead>
             <tr>
@@ -203,24 +161,24 @@ const AccountsPage = ({ onOpenProfile }: AccountsPageProps) => {
           </thead>
           <tbody>
             {paginatedRows.map((row) => (
-              <tr key={row.challengeId}>
-                <td>{row.challengeId}</td>
-                <td>{row.trader}</td>
-                <td>{row.accountSize}</td>
-                <td>{row.mt5Account}</td>
-                <td>{row.mt5Server}</td>
-                <td>{row.mt5Password}</td>
+              <tr key={row.challenge_id}>
+                <td>{row.challenge_id}</td>
+                <td>{row.trader_name ?? `User ${row.user_id}`}</td>
+                <td>{row.account_size}</td>
+                <td>{row.mt5_account ?? '-'}</td>
+                <td>{row.mt5_server ?? '-'}</td>
+                <td>{row.mt5_password ?? '-'}</td>
                 <td>{row.phase}</td>
-                <td>{row.currentPnl}</td>
+                <td>+₦0 (dummy)</td>
                 <td>
                   <button
                     type="button"
                     onClick={() =>
                       onOpenProfile({
-                        name: row.trader,
-                        email: `${row.trader.toLowerCase().replace(/\s+/g, '.').replace(/[^a-z.]/g, '')}@mail.com`,
+                        name: row.trader_name ?? `User ${row.user_id}`,
+                        email: `user${row.user_id}@mail.com`,
                         accounts: '1 / 0',
-                        revenue: row.currentPnl,
+                        revenue: '+₦0 (dummy)',
                         orders: '1',
                         payouts: '₦0',
                       })
@@ -234,12 +192,35 @@ const AccountsPage = ({ onOpenProfile }: AccountsPageProps) => {
           </tbody>
         </table>
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '12px' }}>
-          <small style={{ color: '#fff' }}>
-            Showing {(currentPage - 1) * rowsPerPage + 1} - {Math.min(currentPage * rowsPerPage, challengeRows.length)} of {challengeRows.length}
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginTop: '12px',
+            padding: '0 16px 16px',
+            gap: 12,
+          }}
+        >
+          <small style={{ color: '#d1d5db', fontWeight: 600 }}>
+            Showing {rows.length === 0 ? 0 : (currentPage - 1) * rowsPerPage + 1} - {Math.min(currentPage * rowsPerPage, rows.length)} of {rows.length}
           </small>
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <button type="button" onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))} disabled={currentPage === 1}>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <button
+              type="button"
+              onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+              disabled={currentPage === 1}
+              style={{
+                border: '1px solid #2a2f3a',
+                background: '#151a22',
+                color: '#e5e7eb',
+                borderRadius: 10,
+                padding: '6px 12px',
+                fontWeight: 700,
+                cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
+                opacity: currentPage === 1 ? 0.5 : 1,
+              }}
+            >
               Prev
             </button>
             {Array.from({ length: totalPages }).map((_, index) => {
@@ -250,12 +231,36 @@ const AccountsPage = ({ onOpenProfile }: AccountsPageProps) => {
                   type="button"
                   onClick={() => setCurrentPage(page)}
                   disabled={currentPage === page}
+                  style={{
+                    minWidth: 34,
+                    border: currentPage === page ? '1px solid #f59e0b' : '1px solid #2a2f3a',
+                    background: currentPage === page ? 'rgba(245,158,11,0.15)' : '#11151d',
+                    color: currentPage === page ? '#fcd34d' : '#d1d5db',
+                    borderRadius: 10,
+                    padding: '6px 10px',
+                    fontWeight: 700,
+                    cursor: currentPage === page ? 'default' : 'pointer',
+                  }}
                 >
                   {page}
                 </button>
               )
             })}
-            <button type="button" onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))} disabled={currentPage === totalPages}>
+            <button
+              type="button"
+              onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+              disabled={currentPage === totalPages}
+              style={{
+                border: '1px solid #2a2f3a',
+                background: '#151a22',
+                color: '#e5e7eb',
+                borderRadius: 10,
+                padding: '6px 12px',
+                fontWeight: 700,
+                cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
+                opacity: currentPage === totalPages ? 0.5 : 1,
+              }}
+            >
               Next
             </button>
           </div>

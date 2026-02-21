@@ -1,29 +1,38 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import DesktopHeader from '../components/DesktopHeader'
 import DesktopSidebar from '../components/DesktopSidebar'
 import DesktopFooter from '../components/DesktopFooter'
 import '../styles/DesktopProfilePage.css'
+import { fetchProfile, getPersistedAuthUser, persistAuthUser, updateProfile } from '../lib/auth'
+
+const persistedUser = getPersistedAuthUser()
 
 const DesktopProfilePage: React.FC = () => {
   const [showEditNameModal, setShowEditNameModal] = useState(false)
-  const [editingField, setEditingField] = useState<'fullName' | 'nickName'>('fullName')
-  const [fullName, setFullName] = useState('John Doe')
-  const [nickName, setNickName] = useState('Gold Emperor')
-  const [newFullName, setNewFullName] = useState('John Doe')
+  const [fullName, setFullName] = useState(persistedUser?.full_name || '')
+  const [nickName, setNickName] = useState(persistedUser?.nick_name || '')
+  const [newNickName, setNewNickName] = useState(persistedUser?.nick_name || '')
   const [editPin, setEditPin] = useState('')
   const [editError, setEditError] = useState('')
+  const [email, setEmail] = useState(persistedUser?.email || '')
+
+  useEffect(() => {
+    const loadProfile = async () => {
+      try {
+        const profile = await fetchProfile()
+        setFullName(profile.full_name || '')
+        setNickName(profile.nick_name || '')
+        setEmail(profile.email || '')
+      } catch (error) {
+        console.warn('Failed to load profile:', error)
+      }
+    }
+
+    loadProfile()
+  }, [])
 
   const handleEditName = () => {
-    setEditingField('fullName')
-    setNewFullName(fullName)
-    setEditPin('')
-    setEditError('')
-    setShowEditNameModal(true)
-  }
-
-  const handleEditNickName = () => {
-    setEditingField('nickName')
-    setNewFullName(nickName)
+    setNewNickName(nickName)
     setEditPin('')
     setEditError('')
     setShowEditNameModal(true)
@@ -35,22 +44,28 @@ const DesktopProfilePage: React.FC = () => {
     setEditError('')
   }
 
-  const handleSaveName = () => {
-    const cleaned = newFullName.trim()
+  const handleSaveName = async () => {
+    const cleaned = newNickName.trim()
     if (!cleaned) {
-      setEditError('This field is required')
+      setEditError('Nickname is required')
       return
     }
 
     if (!/^\d{4}$/.test(editPin)) {
-      setEditError(`Enter your 4-digit PIN to change ${editingField === 'fullName' ? 'full name' : 'nickname'}`)
+      setEditError('Enter your 4-digit PIN to change nickname')
       return
     }
 
-    if (editingField === 'fullName') {
-      setFullName(cleaned)
-    } else {
-      setNickName(cleaned)
+    try {
+      const updated = await updateProfile({ nick_name: cleaned })
+      setFullName(updated.full_name || '')
+      setNickName(updated.nick_name || '')
+      setEmail(updated.email || '')
+      persistAuthUser(updated)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to update profile'
+      setEditError(message)
+      return
     }
 
     setEditError('')
@@ -90,7 +105,7 @@ const DesktopProfilePage: React.FC = () => {
               <i className="fas fa-user profile-avatar-icon"></i>
             </div>
             <div className="profile-name">{fullName}</div>
-            <div className="profile-email">john.doe@email.com</div>
+            <div className="profile-email">{email}</div>
           </div>
 
           {/* Profile Main Content */}
@@ -100,7 +115,7 @@ const DesktopProfilePage: React.FC = () => {
               <div className="section-header">
                 <h3 className="section-title">Nick Name</h3>
                 <button
-                  onClick={handleEditNickName}
+                  onClick={handleEditName}
                   className="edit-button"
                 >
                   <i className="fas fa-edit"></i>
@@ -114,12 +129,6 @@ const DesktopProfilePage: React.FC = () => {
             <div className="profile-section">
               <div className="section-header">
                 <h3 className="section-title">Full Name</h3>
-                <button
-                  onClick={handleEditName}
-                  className="edit-button"
-                >
-                  <i className="fas fa-edit"></i>
-                </button>
               </div>
               <div className="section-content">{fullName}</div>
               <div className="section-subtitle">Your display name</div>
@@ -133,28 +142,26 @@ const DesktopProfilePage: React.FC = () => {
         <div className="desktop-edit-name-modal-overlay" onClick={handleCloseEditNameModal}>
           <div className="desktop-edit-name-modal" onClick={(e) => e.stopPropagation()}>
             <div className="desktop-edit-name-modal-header">
-              <h3>{editingField === 'fullName' ? 'Edit Full Name' : 'Edit Nick Name'}</h3>
+              <h3>Edit Nick Name</h3>
               <button onClick={handleCloseEditNameModal} className="desktop-edit-name-close-btn">
                 <i className="fas fa-times"></i>
               </button>
             </div>
 
             <p className="desktop-edit-name-modal-subtitle">
-              {editingField === 'fullName'
-                ? 'Update your display name for your profile.'
-                : 'Update your nickname used across your profile and certificates.'}
+              Update your nickname used across your profile and certificates.
             </p>
 
             <div className="desktop-edit-name-field">
-              <label>{editingField === 'fullName' ? 'Full Name' : 'Nick Name'}</label>
+              <label>Nick Name</label>
               <input
                 type="text"
-                value={newFullName}
+                value={newNickName}
                 onChange={(e) => {
-                  setNewFullName(e.target.value)
+                  setNewNickName(e.target.value)
                   if (editError) setEditError('')
                 }}
-                placeholder={editingField === 'fullName' ? 'Enter full name' : 'Enter nick name'}
+                placeholder="Enter nick name"
               />
             </div>
 

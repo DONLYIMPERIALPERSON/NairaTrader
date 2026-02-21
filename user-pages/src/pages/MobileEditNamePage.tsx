@@ -1,13 +1,32 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import '../styles/MobileEditNamePage.css'
+import { fetchProfile, getPersistedAuthUser, persistAuthUser, updateProfile } from '../lib/auth'
+
+const persistedUser = getPersistedAuthUser()
 
 const MobileEditNamePage: React.FC = () => {
   const navigate = useNavigate()
-  const [fullName, setFullName] = useState('John Doe')
+  const [currentFullName, setCurrentFullName] = useState(persistedUser?.full_name || '')
+  const [fullName, setFullName] = useState(persistedUser?.full_name || '')
   const [otp, setOtp] = useState('')
   const [showOtpInput, setShowOtpInput] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+
+  useEffect(() => {
+    const loadProfile = async () => {
+      try {
+        const profile = await fetchProfile()
+        const name = profile.full_name || ''
+        setCurrentFullName(name)
+        setFullName(name)
+      } catch (error) {
+        console.warn('Failed to load profile for edit-name page:', error)
+      }
+    }
+
+    loadProfile()
+  }, [])
 
   const handleBack = () => {
     navigate(-1)
@@ -25,12 +44,16 @@ const MobileEditNamePage: React.FC = () => {
   const handleSaveChanges = () => {
     if (otp.length === 6) {
       setIsLoading(true)
-      // Simulate API call
-      setTimeout(() => {
+      updateProfile({ full_name: fullName.trim() })
+        .then((updated) => {
+          persistAuthUser(updated)
+          setCurrentFullName(updated.full_name || '')
+          setFullName(updated.full_name || '')
+        })
+        .finally(() => {
         setIsLoading(false)
-        // Navigate back to profile
         navigate('/profile')
-      }, 2000)
+        })
     }
   }
 
@@ -65,7 +88,7 @@ const MobileEditNamePage: React.FC = () => {
                 </h3>
               </div>
               <div style={{fontSize: '16px', color: 'rgba(255,255,255,0.8)', padding: '12px', background: 'rgba(255,255,255,0.05)', borderRadius: '8px'}}>
-                John Doe
+                {currentFullName || 'No name set'}
               </div>
             </div>
           </div>
@@ -102,7 +125,7 @@ const MobileEditNamePage: React.FC = () => {
               {!showOtpInput && (
                 <button
                   onClick={handleRequestOtp}
-                  disabled={isLoading || fullName.trim() === '' || fullName === 'John Doe'}
+                  disabled={isLoading || fullName.trim() === '' || fullName === currentFullName}
                   style={{
                     width: '100%',
                     background: isLoading ? 'rgba(255,215,0,0.5)' : 'rgba(255,215,0,0.8)',

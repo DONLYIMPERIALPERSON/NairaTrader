@@ -2,14 +2,16 @@ import React from 'react'
 import { useNavigate } from 'react-router-dom'
 
 interface AccountProps {
+  challengeId: string;
   phase: string;
   accountNumber: string;
   startDate: string;
   amount: string;
   status: 'Active' | 'Ready' | 'Passed' | 'Failed';
+  passedStage?: string | null;
 }
 
-const DesktopAccountCard: React.FC<AccountProps> = ({ phase, accountNumber, startDate, amount, status }) => {
+const DesktopAccountCard: React.FC<AccountProps> = ({ challengeId, phase, accountNumber, startDate, amount, status, passedStage }) => {
   const navigate = useNavigate()
 
   const getStatusColor = (status: string) => {
@@ -23,7 +25,7 @@ const DesktopAccountCard: React.FC<AccountProps> = ({ phase, accountNumber, star
   };
 
   const handleClick = () => {
-    navigate('/account-details')
+    navigate(`/account-overview?challenge_id=${encodeURIComponent(challengeId)}`)
   }
 
   return (
@@ -73,6 +75,16 @@ const DesktopAccountCard: React.FC<AccountProps> = ({ phase, accountNumber, star
             color: '#333'
           }}>
             {phase} · {accountNumber}
+            {passedStage && (
+              <div style={{
+                fontSize: '12px',
+                fontWeight: '500',
+                color: '#27ae60',
+                marginTop: '2px'
+              }}>
+                ✓ {passedStage} Passed
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -136,7 +148,7 @@ const DesktopAccountCard: React.FC<AccountProps> = ({ phase, accountNumber, star
             }}
             onClick={(e) => {
               e.stopPropagation();
-              navigate('/credentials');
+              navigate(`/credentials?challenge_id=${encodeURIComponent(challengeId)}`);
             }}
             onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8f9fa'}
             onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
@@ -158,7 +170,7 @@ const DesktopAccountCard: React.FC<AccountProps> = ({ phase, accountNumber, star
             }}
             onClick={(e) => {
               e.stopPropagation();
-              navigate('/account-overview');
+              navigate(`/account-overview?challenge_id=${encodeURIComponent(challengeId)}`);
             }}
             onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8f9fa'}
             onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
@@ -180,7 +192,7 @@ const DesktopAccountCard: React.FC<AccountProps> = ({ phase, accountNumber, star
             }}
             onClick={(e) => {
               e.stopPropagation();
-              navigate('/statistics');
+              navigate(`/statistics?challenge_id=${encodeURIComponent(challengeId)}`);
             }}
             onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8f9fa'}
             onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}

@@ -1,7 +1,122 @@
 import { ArrowRightIcon, PlayIcon, ZapIcon, CheckIcon } from 'lucide-react';
 import { PrimaryButton, GhostButton } from './Buttons';
+import { useEffect, useState } from 'react';
+
+const BACKEND_BASE_URL = import.meta.env.VITE_BACKEND_URL;
+
+const HERO_STATS_CACHE_KEY = 'nairatrader_public_hero_stats_v1';
+const HERO_STATS_CACHE_TTL_MS = 1000 * 60 * 15;
+
+type HeroStats = {
+    total_paid_out: string;
+    paid_this_month: string;
+    paid_today: string;
+    trusted_traders: string;
+};
+
+const defaultHeroStats: HeroStats = {
+    total_paid_out: '1000000000',
+    paid_this_month: '97999480',
+    paid_today: '11551014',
+    trusted_traders: '50000',
+};
+
+type CachedHeroStats = {
+    timestamp: number;
+    stats: HeroStats;
+};
+
+const formatNaira = (value: string) => {
+    const clean = value.replace(/^₦\s*/i, '').replace(/,/g, '').trim();
+    const asNumber = Number(clean);
+
+    if (!Number.isFinite(asNumber)) {
+        return `₦${clean || '0'}`;
+    }
+
+    const hasDecimal = clean.includes('.');
+    const formatted = asNumber.toLocaleString('en-US', {
+        minimumFractionDigits: hasDecimal ? 2 : 0,
+        maximumFractionDigits: 2,
+    });
+
+    return `₦${formatted}`;
+};
+
+const formatNairaBillionFriendly = (value: string) => {
+    const clean = value.replace(/^₦\s*/i, '').replace(/,/g, '').trim();
+    const asNumber = Number(clean);
+    if (!Number.isFinite(asNumber)) return formatNaira(value);
+
+    if (asNumber >= 1_000_000_000) {
+        const inBillions = asNumber / 1_000_000_000;
+        const display = Number.isInteger(inBillions) ? String(inBillions) : inBillions.toFixed(1);
+        return `₦${display} Billion`;
+    }
+
+    return formatNaira(value);
+};
+
+const formatCountWithCommas = (value: string) => {
+    const clean = value.replace(/,/g, '').trim();
+    const asNumber = Number(clean);
+    if (!Number.isFinite(asNumber)) return value;
+    return asNumber.toLocaleString('en-US', { maximumFractionDigits: 0 });
+};
 
 export default function Hero() {
+    const [heroStats, setHeroStats] = useState<HeroStats>(defaultHeroStats);
+
+    useEffect(() => {
+        const readFreshCache = (): HeroStats | null => {
+            try {
+                const raw = localStorage.getItem(HERO_STATS_CACHE_KEY);
+                if (!raw) return null;
+
+                const cached = JSON.parse(raw) as CachedHeroStats;
+                const isFresh = Date.now() - cached.timestamp < HERO_STATS_CACHE_TTL_MS;
+                if (!isFresh) return null;
+                return cached.stats;
+            } catch {
+                return null;
+            }
+        };
+
+        const writeCache = (stats: HeroStats) => {
+            try {
+                const payload: CachedHeroStats = {
+                    timestamp: Date.now(),
+                    stats,
+                };
+                localStorage.setItem(HERO_STATS_CACHE_KEY, JSON.stringify(payload));
+            } catch {
+                // ignore cache write errors
+            }
+        };
+
+        const cached = readFreshCache();
+        if (cached) {
+            setHeroStats(cached);
+            return;
+        }
+
+        const loadHeroStats = async () => {
+            if (!BACKEND_BASE_URL) return;
+            try {
+                const response = await fetch(`${BACKEND_BASE_URL}/public/hero/stats`, { cache: 'no-store' });
+                if (!response.ok) return;
+                const payload = (await response.json()) as { stats?: HeroStats };
+                if (!payload.stats) return;
+
+                setHeroStats(payload.stats);
+                writeCache(payload.stats);
+            } catch {
+                // keep default zeros on fetch failure
+            }
+        };
+
+        void loadHeroStats();
+    }, []);
 
     const trustedUserImages = [
         '/trusted-user-images/09527d0d-f2d0-45f4-8610-1e81ef095a6b.jpg',
@@ -41,12 +156,12 @@ export default function Hero() {
                                     ))}
                                 </div>
                                 <span className="text-xs text-gray-200/90">
-                                    Trusted by 50,000+ Traders
+                                    Trusted by {formatCountWithCommas(heroStats.trusted_traders)}+ Traders
                                 </span>
                             </a>
 
                             <h1 className="text-4xl md:text-5xl font-bold leading-tight mb-6 max-w-xl">
-                                Over ₦1Billion <br />
+                                Over {formatNairaBillionFriendly(heroStats.total_paid_out)} <br />
                                 <span className="bg-clip-text text-transparent bg-linear-to-r from-yellow-300 to-yellow-500">
                                     Paid Out
                                 </span>
@@ -79,7 +194,7 @@ export default function Hero() {
                                     <div>
                                         <div>Paid this month</div>
                                         <div className="text-xs text-gray-400">
-                                            ₦97,994,480
+                                            {formatNaira(heroStats.paid_this_month)}
                                         </div>
                                     </div>
                                 </div>
@@ -91,7 +206,7 @@ export default function Hero() {
                                     <div>
                                         <div>Paid today</div>
                                         <div className="text-xs text-gray-400">
-                                            ₦11,551,014
+                                            {formatNaira(heroStats.paid_today)}
                                         </div>
                                     </div>
                                 </div>

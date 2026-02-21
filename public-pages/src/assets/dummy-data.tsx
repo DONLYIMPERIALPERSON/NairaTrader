@@ -31,6 +31,7 @@ export const plansData = [
             'Phases: 2',
             'Min. Trading Days: 1',
             'Profit Split: 70%',
+            'Profit Cap: 100%',
             '24hr Payout'
         ]
     },
@@ -46,6 +47,7 @@ export const plansData = [
             'Phases: 2',
             'Min. Trading Days: 1',
             'Profit Split: 70%',
+            'Profit Cap: 100%',
             '24hr Payout'
         ],
         popular: true
@@ -62,6 +64,7 @@ export const plansData = [
             'Phases: 2',
             'Min. Trading Days: 1',
             'Profit Split: 70%',
+            'Profit Cap: 100%',
             '24hr Payout'
         ]
     },
@@ -77,6 +80,7 @@ export const plansData = [
             'Phases: 2',
             'Min. Trading Days: 1',
             'Profit Split: 70%',
+            'Profit Cap: 100%',
             '24hr Payout'
         ]
     },
@@ -92,6 +96,7 @@ export const plansData = [
             'Phases: 2',
             'Min. Trading Days: 1',
             'Profit Split: 70%',
+            'Profit Cap: 50%',
             'Max Payout: 50%',
             '24hr Payout'
         ]
@@ -108,6 +113,7 @@ export const plansData = [
             'Phases: 2',
             'Min. Trading Days: 1',
             'Profit Split: 70%',
+            'Profit Cap: 50%',
             'Max Payout: 50%',
             '24hr Payout',
             'Status: Paused'

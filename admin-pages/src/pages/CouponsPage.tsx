@@ -1,93 +1,141 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import {
+  createAdminCoupon,
+  fetchAdminChallengeConfig,
+  fetchAdminCoupons,
+  toggleAdminCouponPlan,
+  updateAdminCouponStatus,
+  type AdminCoupon,
+  type ChallengePlanConfig,
+} from '../lib/adminAuth'
 import './CouponsPage.css'
 
 type CouponStatus = 'Active' | 'Expired'
 type CouponValidation = 'Expiry Date' | 'Usage Limit'
 
-type Coupon = {
-  code: string
-  discount: string
-  validationType: CouponValidation
-  expiresOn?: string
-  maxUses?: number
-  used: number
-  status: CouponStatus
-}
-
-const initialCoupons: Coupon[] = [
-  { code: 'WELCOME10', discount: '10%', validationType: 'Expiry Date', expiresOn: '2026-03-30', maxUses: 500, used: 182, status: 'Active' },
-  { code: 'NAIRA50K', discount: '₦50,000', validationType: 'Usage Limit', maxUses: 420, used: 420, status: 'Expired' },
-  { code: 'MARCHBOOST', discount: '15%', validationType: 'Expiry Date', expiresOn: '2026-03-15', maxUses: 300, used: 51, status: 'Active' },
-]
-
 const CouponsPage = () => {
-  const [coupons, setCoupons] = useState<Coupon[]>(initialCoupons)
+  const [coupons, setCoupons] = useState<AdminCoupon[]>([])
+  const [plans, setPlans] = useState<ChallengePlanConfig[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+
   const [code, setCode] = useState('')
-  const [discount, setDiscount] = useState('')
+  const [discountType, setDiscountType] = useState<'percent' | 'fixed'>('percent')
+  const [discountValue, setDiscountValue] = useState('')
   const [validationType, setValidationType] = useState<CouponValidation>('Expiry Date')
   const [expiresOn, setExpiresOn] = useState('')
   const [maxUses, setMaxUses] = useState('')
+  const [applyAllPlans, setApplyAllPlans] = useState(true)
+  const [selectedPlanIds, setSelectedPlanIds] = useState<string[]>([])
 
-  const getCouponStatus = (coupon: Coupon): CouponStatus => {
-    if (coupon.validationType === 'Usage Limit' && coupon.maxUses && coupon.used >= coupon.maxUses) {
-      return 'Expired'
+  const loadData = async () => {
+    setLoading(true)
+    setError('')
+    try {
+      const [couponRes, challengeConfigRes] = await Promise.all([
+        fetchAdminCoupons(),
+        fetchAdminChallengeConfig(),
+      ])
+      setCoupons(couponRes.coupons)
+      setPlans(challengeConfigRes.plans)
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to load coupons')
+    } finally {
+      setLoading(false)
     }
+  }
 
-    return coupon.status
+  useEffect(() => {
+    void loadData()
+  }, [])
+
+  const getCouponStatus = (coupon: AdminCoupon): CouponStatus => (
+    coupon.status === 'Active' ? 'Active' : 'Expired'
+  )
+
+  const formatDiscount = (coupon: AdminCoupon): string => {
+    if (coupon.discount_type === 'percent') {
+      return `${coupon.discount_value}%`
+    }
+    return `₦${coupon.discount_value.toLocaleString()}`
   }
 
   const activeCount = useMemo(() => coupons.filter((c) => getCouponStatus(c) === 'Active').length, [coupons])
   const expiredCount = useMemo(() => coupons.filter((c) => getCouponStatus(c) === 'Expired').length, [coupons])
 
-  const createCoupon = () => {
-    if (!code.trim() || !discount.trim()) return
+  const createCoupon = async () => {
+    if (!code.trim() || !discountValue.trim()) return
     if (validationType === 'Expiry Date' && !expiresOn.trim()) return
     if (validationType === 'Usage Limit' && (!maxUses.trim() || Number(maxUses) <= 0)) return
+    if (!applyAllPlans && selectedPlanIds.length === 0) return
 
-    const newCoupon: Coupon = {
-      code: code.trim().toUpperCase(),
-      discount: discount.trim(),
-      validationType,
-      expiresOn: validationType === 'Expiry Date' ? expiresOn : undefined,
-      maxUses: validationType === 'Usage Limit' ? Number(maxUses) : 500,
-      used: 0,
-      status: 'Active',
+    setSubmitting(true)
+    setError('')
+
+    try {
+      const created = await createAdminCoupon({
+        code: code.trim().toUpperCase(),
+        discount_type: discountType,
+        discount_value: Number(discountValue),
+        max_uses: validationType === 'Usage Limit' ? Number(maxUses) : null,
+        expires_at: validationType === 'Expiry Date' ? `${expiresOn}T23:59:59Z` : null,
+        apply_all_plans: applyAllPlans,
+        applicable_plan_ids: applyAllPlans ? [] : selectedPlanIds,
+      })
+
+      setCoupons((prev) => [created, ...prev])
+      setCode('')
+      setDiscountType('percent')
+      setDiscountValue('')
+      setValidationType('Expiry Date')
+      setExpiresOn('')
+      setMaxUses('')
+      setApplyAllPlans(true)
+      setSelectedPlanIds([])
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to create coupon')
+    } finally {
+      setSubmitting(false)
     }
-
-    setCoupons((prev) => [newCoupon, ...prev])
-    setCode('')
-    setDiscount('')
-    setValidationType('Expiry Date')
-    setExpiresOn('')
-    setMaxUses('')
   }
 
-  const reactivateCoupon = (couponCode: string) => {
-    setCoupons((prev) =>
-      prev.map((coupon) =>
-        coupon.code === couponCode
-          ? {
-              ...coupon,
-              status: 'Active',
-              expiresOn: coupon.validationType === 'Expiry Date' ? '2026-12-31' : coupon.expiresOn,
-              used: coupon.validationType === 'Usage Limit' ? 0 : coupon.used,
-            }
-          : coupon,
-      ),
-    )
+  const togglePlanSelection = (planId: string) => {
+    setSelectedPlanIds((prev) => (
+      prev.includes(planId) ? prev.filter((id) => id !== planId) : [...prev, planId]
+    ))
   }
 
-  const expireCoupon = (couponCode: string) => {
-    setCoupons((prev) =>
-      prev.map((coupon) => (coupon.code === couponCode ? { ...coupon, status: 'Expired' } : coupon)),
-    )
+  const toggleCouponStatus = async (coupon: AdminCoupon) => {
+    try {
+      const updated = await updateAdminCouponStatus(coupon.id, !coupon.is_active)
+      setCoupons((prev) => prev.map((item) => (item.id === coupon.id ? updated : item)))
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to update coupon status')
+    }
+  }
+
+  const isPlanEnabledForCoupon = (coupon: AdminCoupon, planId: string) => {
+    if (coupon.applies_to_all_plans) return true
+    return coupon.applicable_plan_ids.includes(planId)
+  }
+
+  const toggleCouponPlan = async (coupon: AdminCoupon, planId: string) => {
+    try {
+      const nextEnabled = !isPlanEnabledForCoupon(coupon, planId)
+      const updated = await toggleAdminCouponPlan(coupon.id, { plan_id: planId, enabled: nextEnabled })
+      setCoupons((prev) => prev.map((item) => (item.id === coupon.id ? updated : item)))
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to toggle coupon account size')
+    }
   }
 
   return (
     <section className="admin-page-stack coupons-page">
       <div className="admin-dashboard-card">
         <h2>Coupons</h2>
-        <p>Create coupon codes, view active/expired coupons, and reactivate when needed.</p>
+        <p>Create coupon codes, control eligible account sizes, and apply discounts at checkout.</p>
+        {error && <p style={{ color: '#fca5a5', marginTop: 8 }}>{error}</p>}
       </div>
 
       <div className="admin-kpi-grid">
@@ -114,7 +162,17 @@ const CouponsPage = () => {
           </label>
           <label>
             Discount
-            <input value={discount} onChange={(event) => setDiscount(event.target.value)} placeholder="e.g. 20% or ₦25,000" />
+            <div className="coupon-inline-controls">
+              <select value={discountType} onChange={(event) => setDiscountType(event.target.value as 'percent' | 'fixed')}>
+                <option value="percent">Percent (%)</option>
+                <option value="fixed">Fixed (₦)</option>
+              </select>
+              <input
+                value={discountValue}
+                onChange={(event) => setDiscountValue(event.target.value)}
+                placeholder={discountType === 'percent' ? 'e.g. 20' : 'e.g. 25000'}
+              />
+            </div>
           </label>
           <label>
             Validation Type
@@ -141,19 +199,51 @@ const CouponsPage = () => {
             </label>
           )}
         </div>
-        <button type="button" className="coupon-create-btn" onClick={createCoupon}>Create Coupon</button>
+
+        <div className="coupon-plan-scope">
+          <label className="coupon-scope-check">
+            <input
+              type="checkbox"
+              checked={applyAllPlans}
+              onChange={(event) => setApplyAllPlans(event.target.checked)}
+            />
+            Apply to all account sizes
+          </label>
+          {!applyAllPlans && (
+            <div className="coupon-plan-toggle-list">
+              {plans.map((plan) => (
+                <label key={plan.id} className="coupon-plan-toggle-item">
+                  <input
+                    type="checkbox"
+                    checked={selectedPlanIds.includes(plan.id)}
+                    onChange={() => togglePlanSelection(plan.id)}
+                  />
+                  {plan.name}
+                </label>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <button type="button" className="coupon-create-btn" onClick={createCoupon} disabled={submitting}>
+          {submitting ? 'Creating...' : 'Create Coupon'}
+        </button>
       </div>
 
       <div className="admin-table-card">
+        {loading ? (
+          <p>Loading coupons...</p>
+        ) : (
         <table className="admin-table">
           <thead>
             <tr>
               <th>Code</th>
               <th>Discount</th>
-              <th>Validation</th>
+              <th>Type</th>
               <th>Expires On</th>
               <th>Max Uses</th>
               <th>Usage</th>
+              <th>Account Sizes</th>
               <th>Status</th>
               <th>Action</th>
             </tr>
@@ -165,11 +255,25 @@ const CouponsPage = () => {
                 return (
               <tr key={coupon.code}>
                 <td>{coupon.code}</td>
-                <td>{coupon.discount}</td>
-                <td>{coupon.validationType}</td>
-                <td>{coupon.expiresOn ?? '—'}</td>
-                <td>{coupon.maxUses ?? '—'}</td>
-                <td>{coupon.used} / {coupon.maxUses ?? '∞'}</td>
+                <td>{formatDiscount(coupon)}</td>
+                <td>{coupon.discount_type === 'percent' ? 'Percent' : 'Fixed'}</td>
+                <td>{coupon.expires_at ? new Date(coupon.expires_at).toLocaleDateString() : '—'}</td>
+                <td>{coupon.max_uses ?? '—'}</td>
+                <td>{coupon.used_count} / {coupon.max_uses ?? '∞'}</td>
+                <td>
+                  <div className="coupon-plan-toggle-list coupon-plan-toggle-list-inline">
+                    {plans.map((plan) => (
+                      <label key={`${coupon.id}-${plan.id}`} className="coupon-plan-toggle-item">
+                        <input
+                          type="checkbox"
+                          checked={isPlanEnabledForCoupon(coupon, plan.id)}
+                          onChange={() => toggleCouponPlan(coupon, plan.id)}
+                        />
+                        {plan.id}
+                      </label>
+                    ))}
+                  </div>
+                </td>
                 <td>
                   <span className={`coupon-status ${status === 'Active' ? 'active' : 'expired'}`}>
                     {status}
@@ -177,12 +281,12 @@ const CouponsPage = () => {
                 </td>
                 <td>
                   {status === 'Expired' ? (
-                    <button type="button" className="coupon-action-btn reactivate" onClick={() => reactivateCoupon(coupon.code)}>
-                      Reactivate
+                    <button type="button" className="coupon-action-btn reactivate" onClick={() => void toggleCouponStatus(coupon)}>
+                      Activate
                     </button>
                   ) : (
-                    <button type="button" className="coupon-action-btn expire" onClick={() => expireCoupon(coupon.code)}>
-                      Expire
+                    <button type="button" className="coupon-action-btn expire" onClick={() => void toggleCouponStatus(coupon)}>
+                      Deactivate
                     </button>
                   )}
                 </td>
@@ -192,6 +296,7 @@ const CouponsPage = () => {
             ))}
           </tbody>
         </table>
+        )}
       </div>
     </section>
   )

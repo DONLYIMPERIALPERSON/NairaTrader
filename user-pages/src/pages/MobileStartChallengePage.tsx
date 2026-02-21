@@ -1,8 +1,17 @@
 import React, { useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
+import PaymentDetailsModal from '../components/PaymentDetailsModal'
+import {
+  initPalmPayBankTransfer,
+  previewCheckoutCoupon,
+  refreshPaymentOrderStatus,
+  type CheckoutCouponPreviewResponse,
+  type PaymentOrderResponse,
+} from '../lib/auth'
 import '../styles/MobileStartChallengePage.css'
 
 interface AccountData {
+  id?: string;
   size: string;
   drawdown: string;
   target: string;
@@ -18,17 +27,6 @@ const MobileStartChallengePage: React.FC = () => {
   const location = useLocation()
   const accountData = location.state as AccountData
 
-  const [formData, setFormData] = useState({
-    firstName: '',
-    lastName: '',
-    email: '',
-    phone: '',
-    address: '',
-    street: '',
-    postalCode: '',
-    country: 'Nigeria'
-  })
-
   const [agreements, setAgreements] = useState({
     terms: false,
     refund: false
@@ -36,17 +34,28 @@ const MobileStartChallengePage: React.FC = () => {
 
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>('')
   const [promoCode, setPromoCode] = useState<string>('')
+  const [couponLoading, setCouponLoading] = useState(false)
+  const [couponError, setCouponError] = useState('')
+  const [couponPreview, setCouponPreview] = useState<CheckoutCouponPreviewResponse | null>(null)
+  const [paymentLoading, setPaymentLoading] = useState(false)
+  const [paymentStatus, setPaymentStatus] = useState('')
+  const [showPaymentModal, setShowPaymentModal] = useState(false)
+  const [currentOrder, setCurrentOrder] = useState<PaymentOrderResponse | null>(null)
+
+  const inferPlanId = (account: AccountData): string => {
+    if (account.id) return account.id
+    const normalized = account.size.toLowerCase().replace(/\s+/g, '')
+    if (normalized.includes('200k')) return '200k'
+    if (normalized.includes('400k')) return '400k'
+    if (normalized.includes('600k')) return '600k'
+    if (normalized.includes('800k')) return '800k'
+    if (normalized.includes('1.5m')) return '1.5m'
+    if (normalized.includes('3m')) return '3m'
+    return ''
+  }
 
   const handleBack = () => {
     navigate(-1)
-  }
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value } = e.target
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }))
   }
 
   const handleAgreementChange = (type: 'terms' | 'refund') => {
@@ -57,10 +66,88 @@ const MobileStartChallengePage: React.FC = () => {
   }
 
   const handleContinue = () => {
-    if (selectedPaymentMethod) {
-      // Initialize payment SDK here
-      console.log('Proceeding with payment method:', selectedPaymentMethod, { accountData, formData, agreements })
+    if (!selectedPaymentMethod) return
+    if (selectedPaymentMethod !== 'bank-transfer') return
+
+    const planId = inferPlanId(accountData)
+    if (!planId) {
+      setPaymentStatus('Unable to determine account size for payment')
+      return
     }
+
+    setPaymentLoading(true)
+    setPaymentStatus('Initializing bank transfer...')
+
+    initPalmPayBankTransfer({
+      plan_id: planId,
+      coupon_code: couponPreview?.code ?? (promoCode.trim() || null),
+    })
+      .then((order) => {
+        setCurrentOrder(order)
+        setShowPaymentModal(true)
+        setPaymentStatus('')
+
+        if (order.checkout_url) {
+          window.open(order.checkout_url, '_blank', 'noopener,noreferrer')
+        }
+      })
+      .catch((err: unknown) => {
+        setPaymentStatus(err instanceof Error ? err.message : 'Failed to initialize payment')
+      })
+      .finally(() => {
+        setPaymentLoading(false)
+      })
+  }
+
+  const applyCoupon = async () => {
+    if (!promoCode.trim()) return
+    const planId = inferPlanId(accountData)
+    if (!planId) {
+      setCouponError('Unable to determine account size for coupon check')
+      return
+    }
+
+    setCouponLoading(true)
+    setCouponError('')
+    try {
+      const preview = await previewCheckoutCoupon({
+        code: promoCode.trim().toUpperCase(),
+        plan_id: planId,
+      })
+      setCouponPreview(preview)
+    } catch (err: unknown) {
+      setCouponPreview(null)
+      setCouponError(err instanceof Error ? err.message : 'Failed to apply coupon')
+    } finally {
+      setCouponLoading(false)
+    }
+  }
+
+  const handleProceedToPayment = async () => {
+    if (!currentOrder) return
+
+    setShowPaymentModal(false)
+    setPaymentStatus('Waiting for transfer confirmation...')
+
+    for (let i = 0; i < 12; i += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 5000))
+      const refreshed = await refreshPaymentOrderStatus(currentOrder.provider_order_id)
+      if (refreshed.status === 'paid' && refreshed.assignment_status === 'assigned' && refreshed.challenge_id) {
+        setPaymentStatus('Payment successful and account assigned. Redirecting...')
+        navigate('/')
+        return
+      }
+      if (refreshed.status === 'failed' || refreshed.status === 'expired') {
+        setPaymentStatus(`Payment ${refreshed.status}. Please try again.`)
+        return
+      }
+      setPaymentStatus(refreshed.message)
+    }
+  }
+
+  const handleCloseModal = () => {
+    setShowPaymentModal(false)
+    setCurrentOrder(null)
   }
 
   if (!accountData) {
@@ -116,102 +203,6 @@ const MobileStartChallengePage: React.FC = () => {
             </div>
           </div>
 
-          {/* Billing Info */}
-          <div className="mobile-start-account-card">
-            <div className="mobile-start-section-card">
-              <h3 className="billing-title">Billing info</h3>
-              <p className="billing-description">
-                Before you get started, we need some basic information about you.
-              </p>
-
-              <div className="form-grid">
-                <div className="name-row">
-                  <div className="name-input">
-                    <input
-                      type="text"
-                      name="firstName"
-                      placeholder="First name"
-                      value={formData.firstName}
-                      onChange={handleInputChange}
-                      className="form-input"
-                    />
-                  </div>
-                  <div className="name-input">
-                    <input
-                      type="text"
-                      name="lastName"
-                      placeholder="Last name"
-                      value={formData.lastName}
-                      onChange={handleInputChange}
-                      className="form-input"
-                    />
-                  </div>
-                </div>
-
-                <input
-                  type="email"
-                  name="email"
-                  placeholder="Email"
-                  value={formData.email}
-                  onChange={handleInputChange}
-                  className="form-input"
-                />
-
-                <input
-                  type="tel"
-                  name="phone"
-                  placeholder="Phone Number"
-                  value={formData.phone}
-                  onChange={handleInputChange}
-                  className="form-input"
-                />
-
-                <input
-                  type="text"
-                  name="address"
-                  placeholder="Address"
-                  value={formData.address}
-                  onChange={handleInputChange}
-                  className="form-input"
-                />
-
-                <input
-                  type="text"
-                  name="street"
-                  placeholder="Ikorodu Street"
-                  value={formData.street}
-                  onChange={handleInputChange}
-                  className="form-input"
-                />
-
-                <div className="postal-row">
-                  <div className="postal-input">
-                    <input
-                      type="text"
-                      name="postalCode"
-                      placeholder="Postal Code"
-                      value={formData.postalCode}
-                      onChange={handleInputChange}
-                      className="form-input"
-                    />
-                  </div>
-                  <div className="country-select">
-                    <select
-                      name="country"
-                      value={formData.country}
-                      onChange={handleInputChange}
-                      className="country-select"
-                    >
-                      <option value="Nigeria">Nigeria</option>
-                      <option value="Ghana">Ghana</option>
-                      <option value="Kenya">Kenya</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
           {/* Promo Code */}
           <div className="mobile-start-account-card">
             <div className="mobile-start-section-card">
@@ -224,18 +215,16 @@ const MobileStartChallengePage: React.FC = () => {
                   onChange={(e) => setPromoCode(e.target.value)}
                   className="promo-input"
                 />
-                <button className="apply-button">Apply</button>
+                <button className="apply-button" onClick={() => void applyCoupon()} disabled={couponLoading}>
+                  {couponLoading ? 'Applying...' : 'Apply'}
+                </button>
               </div>
-            </div>
-          </div>
-
-          {/* Terms & Conditions */}
-          <div className="mobile-start-account-card">
-            <div className="mobile-start-section-card">
-              <h3 className="terms-title">Terms & Conditions</h3>
-              <div className="terms-placeholder">
-                PDF Placeholder - Terms & Conditions
-              </div>
+              {couponError && <p className="mobile-coupon-error">{couponError}</p>}
+              {couponPreview && (
+                <p className="mobile-coupon-success">
+                  Applied {couponPreview.code}: -{couponPreview.formatted_discount_amount}
+                </p>
+              )}
             </div>
           </div>
 
@@ -272,7 +261,8 @@ const MobileStartChallengePage: React.FC = () => {
               <div className="total-section">
                 <span className="total-label">Total:</span>
                 <div className="total-amount">
-                  <div className="total-value">{accountData.fee}</div>
+                  {couponPreview && <div className="total-subtract">-{couponPreview.formatted_discount_amount}</div>}
+                  <div className="total-value">{couponPreview?.formatted_final_amount ?? accountData.fee}</div>
                   <div className="total-vat">incl. VAT</div>
                 </div>
               </div>
@@ -297,11 +287,9 @@ const MobileStartChallengePage: React.FC = () => {
                     onChange={() => setSelectedPaymentMethod('bank-transfer')}
                     className="payment-radio"
                   />
-                  <div className="payment-logo">
-                    <span className="logo-text">Logo Placeholder</span>
-                  </div>
-                  <div className="payment-info">
-                    <div className="payment-name">Bank Transfer</div>
+                  <div className="payment-pill">
+                    <i className="fas fa-university" aria-hidden="true"></i>
+                    <span className="payment-name">Bank Transfer</span>
                   </div>
                 </div>
 
@@ -317,11 +305,9 @@ const MobileStartChallengePage: React.FC = () => {
                     onChange={() => setSelectedPaymentMethod('atm-cards')}
                     className="payment-radio"
                   />
-                  <div className="payment-logo">
-                    <span className="logo-text">Logo Placeholder</span>
-                  </div>
-                  <div className="payment-info">
-                    <div className="payment-name">ATM Cards & USSD</div>
+                  <div className="payment-pill">
+                    <i className="fas fa-credit-card" aria-hidden="true"></i>
+                    <span className="payment-name">ATM Cards & USSD</span>
                   </div>
                 </div>
               </div>
@@ -364,15 +350,29 @@ const MobileStartChallengePage: React.FC = () => {
           {/* Continue Button */}
           <button
             onClick={handleContinue}
-            disabled={!agreements.terms || !agreements.refund || !selectedPaymentMethod}
+            disabled={!agreements.terms || !agreements.refund || !selectedPaymentMethod || paymentLoading}
             className="continue-button"
           >
-            Continue to Payment
+            {paymentLoading ? 'Processing...' : 'Continue to Payment'}
           </button>
+          {paymentStatus && <p className="mobile-coupon-success">{paymentStatus}</p>}
         </div>
       </div>
 
-
+      {showPaymentModal && currentOrder && (
+        <PaymentDetailsModal
+          isOpen={showPaymentModal}
+          onClose={handleCloseModal}
+          paymentDetails={{
+            bankName: currentOrder.payer_bank_name || '',
+            accountName: currentOrder.payer_account_name || '',
+            accountNumber: currentOrder.payer_virtual_acc_no || '',
+            amount: `₦${(currentOrder.net_amount_kobo / 100).toLocaleString()}`,
+          }}
+          onProceedToPayment={handleProceedToPayment}
+          isProcessing={false}
+        />
+      )}
     </div>
   )
 }

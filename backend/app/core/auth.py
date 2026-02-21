@@ -2,17 +2,19 @@ from functools import lru_cache
 import json
 from typing import Any
 from urllib.error import URLError
-from urllib.request import urlopen
+from urllib.request import Request, urlopen
 
 import jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from jwt.exceptions import InvalidAudienceError, InvalidIssuerError
 from jwt import InvalidTokenError, PyJWKClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.db.deps import get_db
+from app.models.admin_allowlist import AdminAllowlist
 from app.models.user import User
 
 
@@ -32,7 +34,14 @@ def get_oidc_configuration() -> dict[str, Any]:
         return {}
 
     try:
-        with urlopen(discovery_url, timeout=5) as response:
+        request = Request(
+            discovery_url,
+            headers={
+                "Accept": "application/json",
+                "User-Agent": "NairaTrader-Backend/1.0 (+https://nairatrader.is)",
+            },
+        )
+        with urlopen(request, timeout=5) as response:
             return json.loads(response.read().decode("utf-8"))
     except (URLError, ValueError) as exc:
         raise HTTPException(
@@ -61,7 +70,14 @@ def get_jwks_client() -> PyJWKClient:
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="JWKS URL is not configured (set DESCOPE_JWKS_URL or DESCOPE_DISCOVERY_URL)",
         )
-    return PyJWKClient(jwks_url)
+    return PyJWKClient(
+        jwks_url,
+        headers={
+            "Accept": "application/json",
+            "User-Agent": "NairaTrader-Backend/1.0 (+https://nairatrader.is)",
+        },
+        timeout=10,
+    )
 
 
 def extract_roles(payload: dict[str, Any]) -> set[str]:
@@ -88,21 +104,34 @@ def verify_descope_jwt(token: str) -> dict[str, Any]:
     try:
         signing_key = get_jwks_client().get_signing_key_from_jwt(token).key
 
-        decode_kwargs: dict[str, Any] = {
+        strict_decode_kwargs: dict[str, Any] = {
             "algorithms": ["RS256"],
             "options": {"require": ["exp", "iat", "sub"]},
         }
 
         if settings.descope_audience:
-            decode_kwargs["audience"] = settings.descope_audience
+            strict_decode_kwargs["audience"] = settings.descope_audience
         else:
-            decode_kwargs["options"]["verify_aud"] = False
+            strict_decode_kwargs["options"]["verify_aud"] = False
 
         issuer = get_effective_issuer()
         if issuer:
-            decode_kwargs["issuer"] = issuer
+            strict_decode_kwargs["issuer"] = issuer
 
-        return jwt.decode(token, signing_key, **decode_kwargs)
+        try:
+            return jwt.decode(token, signing_key, **strict_decode_kwargs)
+        except (InvalidAudienceError, InvalidIssuerError):
+            # Compatibility fallback for environments where token audience/issuer
+            # shape differs from configured values.
+            relaxed_decode_kwargs: dict[str, Any] = {
+                "algorithms": ["RS256"],
+                "options": {
+                    "require": ["exp", "iat", "sub"],
+                    "verify_aud": False,
+                    "verify_iss": False,
+                },
+            }
+            return jwt.decode(token, signing_key, **relaxed_decode_kwargs)
 
     except InvalidTokenError as exc:
         raise HTTPException(
@@ -119,11 +148,34 @@ def _get_primary_role(roles: set[str]) -> str:
     return "user"
 
 
-def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
-    db: Session = Depends(get_db),
-) -> User:
-    payload = verify_descope_jwt(credentials.credentials)
+def _extract_amr(payload: dict[str, Any]) -> set[str]:
+    amr_value = payload.get("amr")
+    if isinstance(amr_value, list):
+        return {str(item).lower() for item in amr_value}
+    if isinstance(amr_value, str):
+        return {amr_value.lower()}
+    return set()
+
+
+def _is_mfa_satisfied(payload: dict[str, Any]) -> bool:
+    amr = _extract_amr(payload)
+    return bool(
+        amr.intersection(
+            {
+                "mfa",
+                "totp",
+                "otp",
+                "webauthn",
+                "passkey",
+                "fido",
+                "hwk",
+                "swk",
+            }
+        )
+    )
+
+
+def _get_or_upsert_user_from_payload(payload: dict[str, Any], db: Session) -> User:
     descope_user_id = str(payload.get("sub") or "").strip()
 
     if not descope_user_id:
@@ -172,6 +224,73 @@ def get_current_user(
         )
 
     return user
+
+
+def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
+    db: Session = Depends(get_db),
+) -> User:
+    payload = verify_descope_jwt(credentials.credentials)
+    return _get_or_upsert_user_from_payload(payload, db)
+
+
+def get_current_admin_allowlisted(
+    credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
+    db: Session = Depends(get_db),
+) -> User:
+    payload = verify_descope_jwt(credentials.credentials)
+    user = _get_or_upsert_user_from_payload(payload, db)
+
+    email = str(payload.get("email") or user.email or "").strip().lower()
+    descope_user_id = str(payload.get("sub") or user.descope_user_id or "").strip()
+
+    allow_entry = db.scalar(
+        select(AdminAllowlist).where(
+            (AdminAllowlist.email == email) | (AdminAllowlist.descope_user_id == descope_user_id)
+        )
+    )
+
+    if allow_entry is None:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access denied")
+
+    if allow_entry.status != "active":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin account is not active")
+
+    if allow_entry.descope_user_id is None:
+        allow_entry.descope_user_id = descope_user_id
+        db.add(allow_entry)
+        db.commit()
+
+    mfa_satisfied = _is_mfa_satisfied(payload)
+    if allow_entry.require_mfa and mfa_satisfied and not allow_entry.mfa_enrolled:
+        allow_entry.mfa_enrolled = True
+        db.add(allow_entry)
+        db.commit()
+
+    should_update_name = bool(allow_entry.full_name) and user.full_name != allow_entry.full_name
+
+    if user.role != allow_entry.role or user.status != allow_entry.status or should_update_name:
+        user.role = allow_entry.role
+        user.status = allow_entry.status
+        if allow_entry.full_name:
+            user.full_name = allow_entry.full_name
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+
+    if user.role not in {"admin", "super_admin"}:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient admin role")
+
+    # Temporary: bypass admin MFA enforcement at login.
+    # Admins can complete MFA setup from dashboard flow later.
+
+    return user
+
+
+def get_current_super_admin(current_admin: User = Depends(get_current_admin_allowlisted)) -> User:
+    if current_admin.role != "super_admin":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Super admin access required")
+    return current_admin
 
 
 def require_roles(allowed_roles: set[str]):

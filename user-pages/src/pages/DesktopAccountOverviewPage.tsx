@@ -1,10 +1,61 @@
-import React from 'react'
+import React, { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import DesktopHeader from '../components/DesktopHeader'
 import DesktopSidebar from '../components/DesktopSidebar'
 import DesktopFooter from '../components/DesktopFooter'
+import { fetchUserChallengeAccountDetail, type UserChallengeAccountDetailResponse } from '../lib/auth'
 import '../styles/DesktopAccountOverviewPage.css'
 
 const DesktopAccountOverviewPage: React.FC = () => {
+  const [searchParams] = useSearchParams()
+  const [accountData, setAccountData] = useState<UserChallengeAccountDetailResponse | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  const challengeId = searchParams.get('challenge_id')
+
+  useEffect(() => {
+    if (!challengeId) {
+      setError('Challenge ID is required')
+      setLoading(false)
+      return
+    }
+
+    setLoading(true)
+    setError('')
+    fetchUserChallengeAccountDetail(challengeId)
+      .then((data) => {
+        setAccountData(data)
+      })
+      .catch((err: unknown) => {
+        setError(err instanceof Error ? err.message : 'Failed to load account details')
+      })
+      .finally(() => setLoading(false))
+  }, [challengeId])
+
+  if (loading) {
+    return (
+      <div className="account-overview-page">
+        <DesktopHeader />
+        <DesktopSidebar />
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', color: 'white' }}>
+          Loading account details...
+        </div>
+      </div>
+    )
+  }
+
+  if (error || !accountData) {
+    return (
+      <div className="account-overview-page">
+        <DesktopHeader />
+        <DesktopSidebar />
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', color: '#ff8b8b' }}>
+          {error || 'Account not found'}
+        </div>
+      </div>
+    )
+  }
   return (
     <div className="account-overview-page">
       <DesktopHeader />
@@ -42,51 +93,46 @@ const DesktopAccountOverviewPage: React.FC = () => {
                 <i className="fas fa-wallet"></i>
                 Balance
               </div>
-              <div className="balance-value">N100,000</div>
+              <div className="balance-value">N{accountData.metrics.balance.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
             </div>
             <div className="balance-card">
               <div className="balance-card-header">
                 <i className="fas fa-chart-line"></i>
                 Equity
               </div>
-              <div className="balance-value">N100,000</div>
+              <div className="balance-value">N{accountData.metrics.equity.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
             </div>
             <div className="balance-card">
               <div className="balance-card-header">
                 <i className="fas fa-chart-simple"></i>
                 Unrealized PnL
               </div>
-              <div className="balance-value">N0.00</div>
+              <div className={`balance-value ${accountData.metrics.unrealized_pnl >= 0 ? 'positive' : 'negative'}`}>
+                {accountData.metrics.unrealized_pnl >= 0 ? '+' : ''}N{accountData.metrics.unrealized_pnl.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </div>
             </div>
+            {accountData.phase === 'Funded' && (
+              <div className="balance-card">
+                <div className="balance-card-header">
+                  <i className="fas fa-trophy"></i>
+                  Total Profit
+                </div>
+                <div className={`balance-value ${(accountData.funded_profit_raw || 0) >= 0 ? 'positive' : 'negative'}`}>
+                  {(accountData.funded_profit_raw || 0) >= 0 ? '+' : ''}N{(accountData.funded_profit_raw || 0).toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </div>
+              </div>
+            )}
             <div className="balance-card today-profit">
               <div className="balance-card-header">
                 <i className="fas fa-sun"></i>
-                Today's Profit
+                Max Permitted Loss Left
+                <i
+                  className="fas fa-info-circle"
+                  style={{ marginLeft: '6px', fontSize: '12px', opacity: 0.8 }}
+                  title="Amount left before account breaches maximum drawdown."
+                ></i>
               </div>
-              <div className="balance-value">N0.00</div>
-            </div>
-          </div>
-        </div>
-
-        {/* Analysis Section */}
-        <div className="analysis-section">
-          <span className="analysis-title">Analysis</span>
-          <div className="analysis-grid">
-            <div className="analysis-card">
-              <div className="analysis-card-header">
-                <i className="fas fa-arrow-trend-up"></i>
-                <span className="analysis-card-title">Total P/L</span>
-              </div>
-              <div className="analysis-value">N0.00</div>
-              <div className="analysis-subtitle">Lifetime Profit</div>
-            </div>
-            <div className="analysis-card">
-              <div className="analysis-card-header">
-                <i className="fas fa-flag-checkered"></i>
-                <span className="analysis-card-title">Max P/L</span>
-              </div>
-              <div className="analysis-value">N0.00</div>
-              <div className="analysis-subtitle">Peak to Valley</div>
+              <div className="balance-value">N{accountData.metrics.max_permitted_loss_left.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
             </div>
           </div>
         </div>
@@ -98,38 +144,16 @@ const DesktopAccountOverviewPage: React.FC = () => {
             <span className="trading-objective-title">Trading Objective</span>
           </div>
           <div className="objectives-list">
-            <div className="objective-item">
-              <div className="objective-content">
-                <i className="fas fa-circle-exclamation objective-icon max-loss"></i>
-                <span className="objective-text">Max Loss</span>
-                <i className="fas fa-info-circle objective-info" title="Maximum loss allowed per trade"></i>
+            {Object.entries(accountData.objectives).map(([key, objective]) => (
+              <div key={key} className="objective-item">
+                <div className="objective-content">
+                  <i className={`fas fa-${key === 'max_drawdown' ? 'circle-exclamation' : key === 'profit_target' ? 'bullseye' : key === 'scalping_rule' ? 'hourglass-half' : 'calendar-days'} objective-icon ${key === 'max_drawdown' ? 'max-loss' : key === 'profit_target' ? 'profit-target' : key === 'scalping_rule' ? 'time-rule' : 'trading-days'}`}></i>
+                  <span className="objective-text">{objective.label}</span>
+                  <i className="fas fa-info-circle objective-info" title={objective.note || ''}></i>
+                </div>
+                <i className={`fas fa-${objective.status === 'passed' ? 'check-circle' : objective.status === 'breached' ? 'times-circle' : 'far fa-circle'} objective-status ${objective.status === 'passed' ? 'completed' : objective.status === 'breached' ? 'breached' : 'pending'}`} style={objective.status === 'breached' ? {color: '#e74c3c'} : undefined}></i>
               </div>
-              <i className="fas fa-check-circle objective-status completed"></i>
-            </div>
-            <div className="objective-item">
-              <div className="objective-content">
-                <i className="fas fa-bullseye objective-icon profit-target"></i>
-                <span className="objective-text">Profit Target</span>
-                <i className="fas fa-info-circle objective-info" title="Target profit to achieve"></i>
-              </div>
-              <i className="far fa-circle objective-status pending"></i>
-            </div>
-            <div className="objective-item">
-              <div className="objective-content">
-                <i className="fas fa-hourglass-half objective-icon time-rule"></i>
-                <span className="objective-text">5 mins rule</span>
-                <i className="fas fa-info-circle objective-info" title="Minimum time between trades"></i>
-              </div>
-              <i className="fas fa-check-circle objective-status completed"></i>
-            </div>
-            <div className="objective-item">
-              <div className="objective-content">
-                <i className="fas fa-calendar-days objective-icon trading-days"></i>
-                <span className="objective-text">Min Trading Days</span>
-                <i className="fas fa-info-circle objective-info" title="Minimum number of trading days required"></i>
-              </div>
-              <i className="far fa-circle objective-status pending"></i>
-            </div>
+            ))}
           </div>
           <div className="objective-progress-bar"></div>
         </div>

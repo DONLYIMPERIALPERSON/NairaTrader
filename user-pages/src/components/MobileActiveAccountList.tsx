@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import '../styles/MobileActiveAccountList.css'
 
 interface AccountProps {
+  challengeId: string;
   phase: string;
   accountNumber: string;
   startDate: string;
@@ -10,7 +11,7 @@ interface AccountProps {
   status: 'Active' | 'Ready' | 'Passed' | 'Failed';
 }
 
-const MobileActiveAccountList: React.FC<AccountProps> = ({ phase, accountNumber, startDate, amount, status }) => {
+const MobileActiveAccountList: React.FC<AccountProps> = ({ challengeId, phase, accountNumber, startDate, amount, status }) => {
   const navigate = useNavigate()
 
   const getStatusColor = (status: string) => {
@@ -24,7 +25,7 @@ const MobileActiveAccountList: React.FC<AccountProps> = ({ phase, accountNumber,
   };
 
   const handleClick = () => {
-    navigate('/account-details')
+    navigate(`/account-details?challenge_id=${encodeURIComponent(challengeId)}`)
   }
 
   return (

@@ -1,7 +1,23 @@
 import React from 'react'
 import '../styles/MobileDashboardBalanceOverview.css'
 
-const MobileDashboardBalanceOverview: React.FC = () => {
+interface MobileDashboardBalanceOverviewProps {
+  balance: number
+  equity: number
+  unrealizedPnl: number
+  maxPermittedLossLeft: number
+}
+
+const MobileDashboardBalanceOverview: React.FC<MobileDashboardBalanceOverviewProps> = ({
+  balance,
+  equity,
+  unrealizedPnl,
+  maxPermittedLossLeft,
+}) => {
+  const formatCurrency = (amount: number) => {
+    return `N${amount.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  }
+
   return (
     <div className="section">
       <div style={{display: 'flex', alignItems: 'baseline', justifyContent: 'space-between'}}>
@@ -11,19 +27,21 @@ const MobileDashboardBalanceOverview: React.FC = () => {
       <div className="balance-grid">
         <div className="metric-tile">
           <div className="label"><i className="fas fa-wallet" style={{color: '#FFD700', fontSize: '12px'}}></i> Balance</div>
-          <div className="value">N100,000</div>
+          <div className="value">{formatCurrency(balance)}</div>
         </div>
         <div className="metric-tile">
           <div className="label"><i className="fas fa-chart-line" style={{color: '#FFD700'}}></i> Equity</div>
-          <div className="value">N100,000</div>
+          <div className="value">{formatCurrency(equity)}</div>
         </div>
         <div className="metric-tile">
           <div className="label"><i className="fas fa-chart-simple"></i> Unrealized PnL</div>
-          <div className="value">N0.00</div>
+          <div className="value" style={{color: unrealizedPnl >= 0 ? '#2ecc71' : '#e74c3c'}}>
+            {unrealizedPnl >= 0 ? '+' : ''}{formatCurrency(unrealizedPnl)}
+          </div>
         </div>
         <div className="metric-tile highlight-yellow">
-          <div className="label"><i className="fas fa-sun" style={{color: '#FFD700'}}></i> Today's Profit</div>
-          <div className="value">N0.00</div>
+          <div className="label" title="Amount left before account breaches maximum drawdown."><i className="fas fa-sun" style={{color: '#FFD700'}}></i> Max Permitted Loss Left</div>
+          <div className="value">{formatCurrency(maxPermittedLossLeft)}</div>
         </div>
       </div>
     </div>

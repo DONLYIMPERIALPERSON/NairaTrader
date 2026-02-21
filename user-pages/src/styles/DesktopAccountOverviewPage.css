@@ -341,6 +341,10 @@
   color: #2ecc71;
 }
 
+.objective-status.breached {
+  color: #e74c3c;
+}
+
 .objective-status.pending {
   color: #ccc;
 }

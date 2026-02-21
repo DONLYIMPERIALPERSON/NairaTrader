@@ -1,28 +1,40 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import '../styles/MobileProfilePage.css'
+import { fetchProfile, getPersistedAuthUser, persistAuthUser, updateProfile } from '../lib/auth'
+
+const persistedUser = getPersistedAuthUser()
 
 const MobileProfilePage: React.FC = () => {
   const navigate = useNavigate()
-  const [fullName, setFullName] = useState('John Doe')
-  const [nickName, setNickName] = useState('Gold Emperor')
-  const [editingField, setEditingField] = useState<'fullName' | 'nickName' | null>(null)
+  const [fullName, setFullName] = useState(persistedUser?.full_name || '')
+  const [nickName, setNickName] = useState(persistedUser?.nick_name || '')
+  const [editingField, setEditingField] = useState<'nickName' | null>(null)
   const [editValue, setEditValue] = useState('')
   const [editPin, setEditPin] = useState('')
   const [editError, setEditError] = useState('')
+  const [email, setEmail] = useState(persistedUser?.email || '')
+
+  useEffect(() => {
+    const loadProfile = async () => {
+      try {
+        const profile = await fetchProfile()
+        setFullName(profile.full_name || '')
+        setNickName(profile.nick_name || '')
+        setEmail(profile.email || '')
+      } catch (error) {
+        console.warn('Failed to load profile:', error)
+      }
+    }
+
+    loadProfile()
+  }, [])
 
   const handleBack = () => {
     navigate(-1)
   }
 
   const handleEditName = () => {
-    setEditingField('fullName')
-    setEditValue(fullName)
-    setEditPin('')
-    setEditError('')
-  }
-
-  const handleEditNickName = () => {
     setEditingField('nickName')
     setEditValue(nickName)
     setEditPin('')
@@ -35,22 +47,28 @@ const MobileProfilePage: React.FC = () => {
     setEditError('')
   }
 
-  const handleSaveEditedValue = () => {
+  const handleSaveEditedValue = async () => {
     const cleaned = editValue.trim()
     if (!cleaned) {
-      setEditError(editingField === 'fullName' ? 'Full name is required' : 'Nickname is required')
+      setEditError('Nickname is required')
       return
     }
 
     if (!/^\d{4}$/.test(editPin)) {
-      setEditError(`Enter your 4-digit PIN to change ${editingField === 'fullName' ? 'full name' : 'nickname'}`)
+      setEditError('Enter your 4-digit PIN to change nickname')
       return
     }
 
-    if (editingField === 'fullName') {
-      setFullName(cleaned)
-    } else {
-      setNickName(cleaned)
+    try {
+      const updated = await updateProfile({ nick_name: cleaned })
+      setFullName(updated.full_name || '')
+      setNickName(updated.nick_name || '')
+      setEmail(updated.email || '')
+      persistAuthUser(updated)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to update profile'
+      setEditError(message)
+      return
     }
 
     handleCloseEditModal()
@@ -95,9 +113,7 @@ const MobileProfilePage: React.FC = () => {
             <div style={{fontSize: '20px', fontWeight: '600', color: 'white'}}>
               {fullName}
             </div>
-            <div style={{fontSize: '14px', color: 'rgba(255,255,255,0.6)'}}>
-              john.doe@email.com
-            </div>
+            <div style={{fontSize: '14px', color: 'rgba(255,255,255,0.6)'}}>{email}</div>
           </div>
 
           {/* Nick Name */}
@@ -113,7 +129,7 @@ const MobileProfilePage: React.FC = () => {
                   </div>
                 </div>
                 <button
-                  onClick={handleEditNickName}
+                  onClick={handleEditName}
                   style={{
                     background: 'rgba(255,215,0,0.1)',
                     border: '1px solid rgba(255,215,0,0.3)',
@@ -141,19 +157,6 @@ const MobileProfilePage: React.FC = () => {
                     {fullName}
                   </div>
                 </div>
-                <button
-                  onClick={handleEditName}
-                  style={{
-                    background: 'rgba(255,215,0,0.1)',
-                    border: '1px solid rgba(255,215,0,0.3)',
-                    borderRadius: '6px',
-                    padding: '8px',
-                    color: '#FFD700',
-                    cursor: 'pointer'
-                  }}
-                >
-                  <i className="fas fa-edit"></i>
-                </button>
               </div>
             </div>
           </div>
@@ -165,14 +168,14 @@ const MobileProfilePage: React.FC = () => {
         <div className="mobile-nickname-modal-overlay" onClick={handleCloseEditModal}>
           <div className="mobile-nickname-modal" onClick={(e) => e.stopPropagation()}>
             <div className="mobile-nickname-modal-header">
-              <h3>{editingField === 'fullName' ? 'Edit Full Name' : 'Edit Nick Name'}</h3>
+              <h3>Edit Nick Name</h3>
               <button onClick={handleCloseEditModal} className="mobile-nickname-modal-close">
                 <i className="fas fa-times"></i>
               </button>
             </div>
 
             <p className="mobile-nickname-modal-subtitle">
-              Enter your new {editingField === 'fullName' ? 'full name' : 'nickname'} and transaction PIN.
+              Enter your new nickname and transaction PIN.
             </p>
 
             <div className="mobile-nickname-modal-fields">
@@ -183,7 +186,7 @@ const MobileProfilePage: React.FC = () => {
                   setEditValue(e.target.value)
                   if (editError) setEditError('')
                 }}
-                placeholder={editingField === 'fullName' ? 'Enter full name' : 'Enter nickname'}
+                placeholder="Enter nickname"
               />
               <input
                 type="password"
@@ -205,6 +208,7 @@ const MobileProfilePage: React.FC = () => {
           </div>
         </div>
       )}
+
     </div>
   )
 }

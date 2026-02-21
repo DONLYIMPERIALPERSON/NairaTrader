@@ -1,12 +1,63 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import DesktopHeader from '../components/DesktopHeader'
 import DesktopSidebar from '../components/DesktopSidebar'
 import DesktopFooter from '../components/DesktopFooter'
+import { fetchUserChallengeAccountDetail, type UserChallengeAccountDetailResponse } from '../lib/auth'
 import '../styles/DesktopCredentialsPage.css'
 
 const DesktopCredentialsPage: React.FC = () => {
+  const [searchParams] = useSearchParams()
+  const [accountData, setAccountData] = useState<UserChallengeAccountDetailResponse | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [showInvestorPassword, setShowInvestorPassword] = useState(false)
+
+  const challengeId = searchParams.get('challenge_id')
+
+  useEffect(() => {
+    if (!challengeId) {
+      setError('Challenge ID is required')
+      setLoading(false)
+      return
+    }
+
+    setLoading(true)
+    setError('')
+    fetchUserChallengeAccountDetail(challengeId)
+      .then((data) => {
+        setAccountData(data)
+      })
+      .catch((err: unknown) => {
+        setError(err instanceof Error ? err.message : 'Failed to load account details')
+      })
+      .finally(() => setLoading(false))
+  }, [challengeId])
+
+  if (loading) {
+    return (
+      <div className="desktop-credentials-page">
+        <DesktopHeader />
+        <DesktopSidebar />
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', color: 'white' }}>
+          Loading account details...
+        </div>
+      </div>
+    )
+  }
+
+  if (error || !accountData) {
+    return (
+      <div className="desktop-credentials-page">
+        <DesktopHeader />
+        <DesktopSidebar />
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', color: '#ff8b8b' }}>
+          {error || 'Account not found'}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="desktop-credentials-page">
@@ -52,12 +103,12 @@ const DesktopCredentialsPage: React.FC = () => {
                 </div>
                 <div className="credential-details">
                   <div className="credential-label">Server</div>
-                  <div className="credential-value">ICMarkets-Live06</div>
+                  <div className="credential-value">{accountData.credentials?.server || 'N/A'}</div>
                 </div>
               </div>
               <button
                 className="action-button"
-                onClick={() => navigator.clipboard.writeText('ICMarkets-Live06')}
+                onClick={() => navigator.clipboard.writeText(accountData.credentials?.server || '')}
               >
                 <i className="fas fa-copy"></i>
                 Copy
@@ -75,7 +126,7 @@ const DesktopCredentialsPage: React.FC = () => {
                 <div className="credential-details">
                   <div className="credential-label">Password</div>
                   <div className="credential-value">
-                    {showPassword ? 'mypassword123' : '••••••••••••'}
+                    {showPassword ? (accountData.credentials?.password || 'N/A') : '••••••••••••'}
                   </div>
                 </div>
               </div>
@@ -98,12 +149,12 @@ const DesktopCredentialsPage: React.FC = () => {
                 </div>
                 <div className="credential-details">
                   <div className="credential-label">Account Number</div>
-                  <div className="credential-value">81054239</div>
+                  <div className="credential-value">{accountData.credentials?.account_number || 'N/A'}</div>
                 </div>
               </div>
               <button
                 className="action-button"
-                onClick={() => navigator.clipboard.writeText('81054239')}
+                onClick={() => navigator.clipboard.writeText(accountData.credentials?.account_number || '')}
               >
                 <i className="fas fa-copy"></i>
                 Copy
@@ -121,7 +172,7 @@ const DesktopCredentialsPage: React.FC = () => {
                 <div className="credential-details">
                   <div className="credential-label">Investor Password</div>
                   <div className="credential-value">
-                    {showInvestorPassword ? 'investorpass' : '••••••••'}
+                    {showInvestorPassword ? (accountData.credentials?.investor_password || 'N/A') : '••••••••'}
                   </div>
                 </div>
               </div>

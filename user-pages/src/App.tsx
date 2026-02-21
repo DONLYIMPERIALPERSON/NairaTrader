@@ -1,5 +1,6 @@
-import React from 'react'
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import React, { useEffect, useState } from 'react'
+import { getSessionToken, useDescope, useSession } from '@descope/react-sdk'
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import HomeMobile from './pages/HomeMobile'
 import HomeDesktop from './pages/HomeDesktop'
 import MobileAccountDetailsPage from './pages/MobileAccountDetailsPage'
@@ -37,35 +38,113 @@ import DesktopStatisticsPage from './pages/DesktopStatisticsPage'
 import DesktopCredentialsPage from './pages/DesktopCredentialsPage'
 import DesktopStartChallengePage from './pages/DesktopStartChallengePage'
 import DesktopLoginPage from './pages/DesktopLoginPage'
+import { getPersistedAuthUser } from './lib/auth'
+
+function RequireUserAuth({ children }: { children: React.ReactElement }) {
+  const descopeSdk = useDescope()
+  const [checkingSession, setCheckingSession] = useState(true)
+  const [hasSessionToken, setHasSessionToken] = useState(Boolean(getSessionToken()))
+  const hasPersistedUser = Boolean(getPersistedAuthUser())
+
+  useEffect(() => {
+    let mounted = true
+
+    const ensureSession = async () => {
+      if (!hasPersistedUser) {
+        if (mounted) {
+          setHasSessionToken(false)
+          setCheckingSession(false)
+        }
+        return
+      }
+
+      if (getSessionToken()) {
+        if (mounted) {
+          setHasSessionToken(true)
+          setCheckingSession(false)
+        }
+        return
+      }
+
+      try {
+        await descopeSdk.refresh()
+      } catch {
+        // best effort refresh
+      }
+
+      if (mounted) {
+        setHasSessionToken(Boolean(getSessionToken()))
+        setCheckingSession(false)
+      }
+    }
+
+    void ensureSession()
+    return () => {
+      mounted = false
+    }
+  }, [descopeSdk, hasPersistedUser])
+
+  if (checkingSession && hasPersistedUser) {
+    return <div style={{ padding: 24, textAlign: 'center' }}>Restoring session...</div>
+  }
+
+  if (!hasSessionToken || !hasPersistedUser) {
+    return <Navigate to="/login" replace />
+  }
+
+  return children
+}
 
 function App() {
+  const descopeSdk = useDescope()
+  useSession()
+
+  useEffect(() => {
+    const hasPersistedUser = Boolean(getPersistedAuthUser())
+    if (!hasPersistedUser) return
+
+    void descopeSdk.refresh().catch(() => {
+      // best effort on app load
+    })
+
+    const intervalId = window.setInterval(() => {
+      void descopeSdk.refresh().catch(() => {
+        // best effort background refresh
+      })
+    }, 5 * 60 * 1000)
+
+    return () => {
+      window.clearInterval(intervalId)
+    }
+  }, [descopeSdk])
+
   const isMobile = window.innerWidth < 768
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={isMobile ? <HomeMobile /> : <HomeDesktop />} />
+        <Route path="/" element={<RequireUserAuth>{isMobile ? <HomeMobile /> : <HomeDesktop />}</RequireUserAuth>} />
         <Route path="/login" element={<DesktopLoginPage />} />
         <Route path="/register" element={<DesktopLoginPage />} />
-        <Route path="/account-details" element={isMobile ? <MobileAccountDetailsPage /> : <DesktopAccountDetailsPage />} />
-        <Route path="/support" element={isMobile ? <MobileSupportPage /> : <DesktopSupportPage />} />
-        <Route path="/previous-chats" element={<MobilePreviousChatsPage />} />
-        <Route path="/trading-accounts" element={isMobile ? <MobileTradingAccountsPage /> : <DesktopTradingAccountsPage />} />
-        <Route path="/start-challenge" element={isMobile ? <MobileStartChallengePage /> : <DesktopStartChallengePage />} />
-        <Route path="/payout" element={isMobile ? <MobilePayoutPage /> : <DesktopPayoutPage />} />
-        <Route path="/affiliate" element={isMobile ? <MobileAffiliatePage /> : <DesktopAffiliatePage />} />
-        <Route path="/promotions" element={isMobile ? <MobilePromotionsPage /> : <DesktopPromotionsPage />} />
-        <Route path="/competition" element={isMobile ? <MobileCompetitionPage /> : <DesktopCompetitionPage />} />
-        <Route path="/contact" element={isMobile ? <MobileContactPage /> : <DesktopContactPage />} />
-        <Route path="/profile" element={isMobile ? <MobileProfilePage /> : <DesktopProfilePage />} />
-        <Route path="/profile/edit-name" element={<MobileEditNamePage />} />
-        <Route path="/profile/payout-details" element={<MobilePayoutDetailsPage />} />
-        <Route path="/settings" element={isMobile ? <MobileSettingsPage /> : <DesktopSettingsPage />} />
-        <Route path="/certificates" element={isMobile ? <MobileCertificatePage /> : <DesktopCertificatePage />} />
-        <Route path="/kyc" element={isMobile ? <MobileKYCPage /> : <DesktopKYCPage />} />
-        <Route path="/leaderboard" element={isMobile ? <MobileLeaderboardPage /> : <DesktopLeaderboardPage />} />
-        <Route path="/account-overview" element={<DesktopAccountOverviewPage />} />
-        <Route path="/statistics" element={<DesktopStatisticsPage />} />
-        <Route path="/credentials" element={<DesktopCredentialsPage />} />
+        <Route path="/account-details" element={<RequireUserAuth>{isMobile ? <MobileAccountDetailsPage /> : <DesktopAccountDetailsPage />}</RequireUserAuth>} />
+        <Route path="/support" element={<RequireUserAuth>{isMobile ? <MobileSupportPage /> : <DesktopSupportPage />}</RequireUserAuth>} />
+        <Route path="/previous-chats" element={<RequireUserAuth><MobilePreviousChatsPage /></RequireUserAuth>} />
+        <Route path="/trading-accounts" element={<RequireUserAuth>{isMobile ? <MobileTradingAccountsPage /> : <DesktopTradingAccountsPage />}</RequireUserAuth>} />
+        <Route path="/start-challenge" element={<RequireUserAuth>{isMobile ? <MobileStartChallengePage /> : <DesktopStartChallengePage />}</RequireUserAuth>} />
+        <Route path="/payout" element={<RequireUserAuth>{isMobile ? <MobilePayoutPage /> : <DesktopPayoutPage />}</RequireUserAuth>} />
+        <Route path="/affiliate" element={<RequireUserAuth>{isMobile ? <MobileAffiliatePage /> : <DesktopAffiliatePage />}</RequireUserAuth>} />
+        <Route path="/promotions" element={<RequireUserAuth>{isMobile ? <MobilePromotionsPage /> : <DesktopPromotionsPage />}</RequireUserAuth>} />
+        <Route path="/competition" element={<RequireUserAuth>{isMobile ? <MobileCompetitionPage /> : <DesktopCompetitionPage />}</RequireUserAuth>} />
+        <Route path="/contact" element={<RequireUserAuth>{isMobile ? <MobileContactPage /> : <DesktopContactPage />}</RequireUserAuth>} />
+        <Route path="/profile" element={<RequireUserAuth>{isMobile ? <MobileProfilePage /> : <DesktopProfilePage />}</RequireUserAuth>} />
+        <Route path="/profile/edit-name" element={<RequireUserAuth><MobileEditNamePage /></RequireUserAuth>} />
+        <Route path="/profile/payout-details" element={<RequireUserAuth><MobilePayoutDetailsPage /></RequireUserAuth>} />
+        <Route path="/settings" element={<RequireUserAuth>{isMobile ? <MobileSettingsPage /> : <DesktopSettingsPage />}</RequireUserAuth>} />
+        <Route path="/certificates" element={<RequireUserAuth>{isMobile ? <MobileCertificatePage /> : <DesktopCertificatePage />}</RequireUserAuth>} />
+        <Route path="/kyc" element={<RequireUserAuth>{isMobile ? <MobileKYCPage /> : <DesktopKYCPage />}</RequireUserAuth>} />
+        <Route path="/leaderboard" element={<RequireUserAuth>{isMobile ? <MobileLeaderboardPage /> : <DesktopLeaderboardPage />}</RequireUserAuth>} />
+        <Route path="/account-overview" element={<RequireUserAuth><DesktopAccountOverviewPage /></RequireUserAuth>} />
+        <Route path="/statistics" element={<RequireUserAuth><DesktopStatisticsPage /></RequireUserAuth>} />
+        <Route path="/credentials" element={<RequireUserAuth><DesktopCredentialsPage /></RequireUserAuth>} />
       </Routes>
     </BrowserRouter>
   )

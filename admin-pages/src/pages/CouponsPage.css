@@ -23,6 +23,55 @@
   padding: 10px;
 }
 
+.coupon-create-grid select {
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.05);
+  color: #fff;
+  border-radius: 10px;
+  padding: 10px;
+}
+
+.coupon-inline-controls {
+  display: grid;
+  grid-template-columns: minmax(120px, auto) 1fr;
+  gap: 8px;
+}
+
+.coupon-plan-scope {
+  margin-top: 14px;
+  display: grid;
+  gap: 10px;
+}
+
+.coupon-scope-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.coupon-plan-toggle-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+}
+
+.coupon-plan-toggle-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.coupon-plan-toggle-list-inline {
+  max-width: 320px;
+}
+
 .coupon-create-btn {
   margin-top: 12px;
   border: 1px solid rgba(250, 204, 21, 0.5);

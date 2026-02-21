@@ -1,20 +1,54 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { fetchPublicChallengePlans, type PublicChallengePlan } from '../lib/auth'
 import '../styles/MobileAccountTypes.css'
+
+type AccountView = {
+  id: string
+  size: string
+  drawdown: string
+  target: string
+  phases: string
+  days: string
+  payout: string
+  fee: string
+  status: 'available' | 'paused'
+  profit_split: string
+  profit_cap: string
+}
+
+const toAccountView = (plan: PublicChallengePlan): AccountView => ({
+  id: plan.id,
+  size: plan.name.replace(/^₦/i, '').replace(/account/i, '').trim(),
+  drawdown: plan.max_drawdown,
+  target: plan.profit_target,
+  phases: plan.phases,
+  days: plan.min_trading_days,
+  payout: plan.payout_frequency,
+  fee: plan.price,
+  status: plan.status === 'Available' && plan.enabled ? 'available' : 'paused',
+  profit_split: plan.profit_split,
+  profit_cap: plan.profit_cap,
+})
 
 const MobileAccountTypes: React.FC = () => {
   const navigate = useNavigate()
   const [showNumbers, setShowNumbers] = useState<{[key: string]: boolean}>({})
   const [showTooltip, setShowTooltip] = useState<string | null>(null)
+  const [accounts, setAccounts] = useState<AccountView[]>([])
+  const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
 
-  const accounts = [
-    { size: '200k', drawdown: '20%', target: '10%', phases: '2', days: '1', payout: '24hr', fee: '₦8,900', status: 'available' },
-    { size: '400k', drawdown: '20%', target: '10%', phases: '2', days: '1', payout: '24hr', fee: '₦18,500', status: 'available' },
-    { size: '600k', drawdown: '20%', target: '10%', phases: '2', days: '1', payout: '24hr', fee: '₦28,000', status: 'available' },
-    { size: '800k', drawdown: '20%', target: '10%', phases: '2', days: '1', payout: '24hr', fee: '₦38,000', status: 'available' },
-    { size: '1.5m', drawdown: '20%', target: '10%', phases: '2', days: '1', payout: '24hr', fee: '₦99,000', status: 'available' },
-    { size: '3m', drawdown: '20%', target: '10%', phases: '2', days: '1', payout: '24hr', fee: '₦180,000', status: 'paused' },
-  ]
+  useEffect(() => {
+    setLoading(true)
+    setLoadError('')
+    fetchPublicChallengePlans()
+      .then((plans) => setAccounts(plans.map(toAccountView)))
+      .catch((err: unknown) => {
+        setLoadError(err instanceof Error ? err.message : 'Failed to load trading account plans')
+      })
+      .finally(() => setLoading(false))
+  }, [])
 
   const toggleShowNumbers = (accountSize: string) => {
     setShowNumbers(prev => ({
@@ -24,10 +58,11 @@ const MobileAccountTypes: React.FC = () => {
   }
 
   const getAccountSizeNumber = (size: string) => {
-    if (size.includes('k')) {
-      return parseInt(size.replace('k', '')) * 1000
-    } else if (size.includes('m')) {
-      return parseInt(size.replace('m', '')) * 1000000
+    const normalized = size.toLowerCase().replace(/[^0-9.km]/g, '')
+    if (normalized.includes('k')) {
+      return parseFloat(normalized.replace('k', '')) * 1000
+    } else if (normalized.includes('m')) {
+      return parseFloat(normalized.replace('m', '')) * 1000000
     }
     return 0
   }
@@ -56,6 +91,13 @@ const MobileAccountTypes: React.FC = () => {
         <span className="mobile-account-types-title"><i className="fas fa-chart-line" style={{color: '#FFD700', marginRight: '6px'}}></i> Trading Accounts</span>
       </div>
 
+      {loading ? (
+        <div style={{ color: 'rgba(255,255,255,0.75)', padding: '12px 0' }}>Loading trading accounts...</div>
+      ) : loadError ? (
+        <div style={{ color: '#ff8b8b', padding: '12px 0' }}>{loadError}</div>
+      ) : accounts.length === 0 ? (
+        <div style={{ color: 'rgba(255,255,255,0.75)', padding: '12px 0' }}>No account plans are currently available.</div>
+      ) : (
       <div className="mobile-accounts-list">
         {accounts.map((account, index) => (
           <div key={index} className="mobile-account-card">
@@ -118,19 +160,19 @@ const MobileAccountTypes: React.FC = () => {
               </div>
               <div className="mobile-spec-row">
                 <span className="mobile-spec-label">Profit Split</span>
-                <span className="mobile-spec-value">70%</span>
+                <span className="mobile-spec-value">{account.profit_split}</span>
               </div>
-              {(account.size === '1.5m' || account.size === '3m') && (
+              {account.profit_cap && (
                 <div className="mobile-spec-row" style={{position: 'relative'}}>
                   <span className="mobile-spec-label" style={{display: 'flex', alignItems: 'center', gap: '4px'}}>
-                    Max Payout
+                    Payout Cap
                     <i
                       className="fas fa-info-circle"
                       style={{color: '#FFD700', fontSize: '12px', cursor: 'pointer'}}
                       onClick={() => setShowTooltip(showTooltip === `${account.size}-max-payout` ? null : `${account.size}-max-payout`)}
                     ></i>
                   </span>
-                  <span className="mobile-spec-value">50%</span>
+                  <span className="mobile-spec-value">{account.profit_cap}</span>
                   {showTooltip === `${account.size}-max-payout` && (
                     <div style={{
                       position: 'absolute',
@@ -147,7 +189,7 @@ const MobileAccountTypes: React.FC = () => {
                       marginTop: '4px',
                       lineHeight: '1.4'
                     }}>
-                      Maximum payout for {account.size} accounts is capped at 50% per payout cycle. Exceeding this threshold does not constitute a violation, however payouts will be limited to 50%.
+                      Payout cap for {account.size} accounts is {account.profit_cap} per payout cycle. Exceeding this threshold does not constitute a violation, however payouts will be limited to this cap.
                       <div style={{
                         position: 'absolute',
                         top: '-6px',
@@ -163,7 +205,7 @@ const MobileAccountTypes: React.FC = () => {
                 </div>
               )}
               <div className="mobile-spec-row">
-                <span className="mobile-spec-label">24hr Payout</span>
+                <span className="mobile-spec-label">Payout</span>
                 <span className="mobile-spec-value">{account.payout}</span>
               </div>
               <div className="mobile-spec-row">
@@ -183,6 +225,7 @@ const MobileAccountTypes: React.FC = () => {
           </div>
         ))}
       </div>
+      )}
     </div>
   )
 }

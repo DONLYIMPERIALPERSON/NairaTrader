@@ -1,6 +1,7 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import '../styles/MobilePayoutPage.css'
+import { payoutAPI, formatCurrency, formatDate, formatTimeAgo, type PayoutSummaryResponse } from '../lib/payout'
 
 const MobilePayoutPage: React.FC = () => {
   const navigate = useNavigate()
@@ -8,6 +9,28 @@ const MobilePayoutPage: React.FC = () => {
   const [showPinModal, setShowPinModal] = useState(false)
   const [pinCode, setPinCode] = useState('')
   const [pinError, setPinError] = useState('')
+  const [payoutData, setPayoutData] = useState<PayoutSummaryResponse | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [selectedAccountId, setSelectedAccountId] = useState<number | null>(null)
+  const [verifyingPin, setVerifyingPin] = useState(false)
+
+  useEffect(() => {
+    const fetchPayoutData = async () => {
+      try {
+        setLoading(true)
+        setError(null)
+        const data = await payoutAPI.getPayoutSummary()
+        setPayoutData(data)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load payout data')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchPayoutData()
+  }, [])
 
   const handleBack = () => {
     navigate(-1)
@@ -25,16 +48,32 @@ const MobilePayoutPage: React.FC = () => {
     setPinError('')
   }
 
-  const handleConfirmPin = () => {
+  const handleConfirmPin = async () => {
     if (!/^\d{4}$/.test(pinCode)) {
       setPinError('Enter a valid 4-digit PIN')
       return
     }
 
-    setShowPinModal(false)
-    setPinCode('')
-    setPinError('')
-    alert('PIN verified. Withdrawal request submitted.')
+    if (!selectedAccountId) {
+      setPinError('Please select an account')
+      return
+    }
+
+    try {
+      setVerifyingPin(true)
+      setPinError('')
+      const response = await payoutAPI.requestPayout(selectedAccountId)
+      setShowPinModal(false)
+      setPinCode('')
+      alert(response.message || 'Withdrawal request submitted successfully!')
+      // Refresh payout data
+      const data = await payoutAPI.getPayoutSummary()
+      setPayoutData(data)
+    } catch (error) {
+      setPinError(error instanceof Error ? error.message : 'Failed to submit withdrawal request')
+    } finally {
+      setVerifyingPin(false)
+    }
   }
 
   return (
@@ -64,29 +103,47 @@ const MobilePayoutPage: React.FC = () => {
             </p>
           </div>
 
+          {/* Loading/Error States */}
+          {loading && (
+            <div className="mobile-loading-state">
+              <div className="mobile-loading-spinner"></div>
+              <p>Loading payout information...</p>
+            </div>
+          )}
+
+          {error && (
+            <div className="mobile-error-state">
+              <i className="fas fa-exclamation-triangle"></i>
+              <p>{error}</p>
+              <button onClick={() => window.location.reload()}>Retry</button>
+            </div>
+          )}
+
           {/* Combined Stats Card */}
-          <div className="mobile-payout-card" style={{marginBottom: '24px'}}>
-            <div className="mobile-payout-card-inner">
-              <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
-                {/* Total Withdrawn - Left */}
-                <div style={{flex: 1}}>
-                  <div style={{fontSize: '10px', color: 'rgba(255,255,255,0.6)', marginBottom: '2px'}}>Total Withdrawn</div>
-                  <div style={{fontSize: '14px', fontWeight: '700', color: '#FFD700'}}>₦2,450,000</div>
-                  <div style={{fontSize: '8px', color: 'rgba(255,255,255,0.5)'}}>All-time</div>
-                </div>
+          {payoutData && (
+            <div className="mobile-payout-card" style={{marginBottom: '24px'}}>
+              <div className="mobile-payout-card-inner">
+                <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+                  {/* Total Earned - Left */}
+                  <div style={{flex: 1}}>
+                    <div style={{fontSize: '10px', color: 'rgba(255,255,255,0.6)', marginBottom: '2px'}}>Total Earned</div>
+                    <div style={{fontSize: '14px', fontWeight: '700', color: '#FFD700'}}>{formatCurrency(payoutData.total_earned_all_time)}</div>
+                    <div style={{fontSize: '8px', color: 'rgba(255,255,255,0.5)'}}>All-time</div>
+                  </div>
 
-                {/* Divider */}
-                <div style={{width: '1px', height: '40px', background: 'rgba(255,255,255,0.1)', margin: '0 12px'}}></div>
+                  {/* Divider */}
+                  <div style={{width: '1px', height: '40px', background: 'rgba(255,255,255,0.1)', margin: '0 12px'}}></div>
 
-                {/* Last Withdrawal - Right */}
-                <div style={{flex: 1}}>
-                  <div style={{fontSize: '10px', color: 'rgba(255,255,255,0.6)', marginBottom: '2px'}}>Last Withdrawal</div>
-                  <div style={{fontSize: '14px', fontWeight: '700', color: '#FFD700'}}>₦150,000</div>
-                  <div style={{fontSize: '8px', color: 'rgba(255,255,255,0.5)'}}>2.5 hrs</div>
+                  {/* Available Payout - Right */}
+                  <div style={{flex: 1}}>
+                    <div style={{fontSize: '10px', color: 'rgba(255,255,255,0.6)', marginBottom: '2px'}}>Available Payout</div>
+                    <div style={{fontSize: '14px', fontWeight: '700', color: '#FFD700'}}>{formatCurrency(payoutData.total_available_payout)}</div>
+                    <div style={{fontSize: '8px', color: 'rgba(255,255,255,0.5)'}}>Ready to withdraw</div>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
+          )}
 
           {/* Tabs */}
           <div style={{display: 'flex', background: 'rgba(255,255,255,0.05)', borderRadius: '12px', padding: '4px', marginBottom: '20px'}}>
@@ -125,7 +182,7 @@ const MobilePayoutPage: React.FC = () => {
           </div>
 
           {/* Tab Content */}
-          {activeTab === 'request' && (
+          {activeTab === 'request' && payoutData && (
             <div className="mobile-payout-card">
               <div className="mobile-payout-card-inner">
                 <h3 style={{fontSize: '18px', fontWeight: '600', color: 'white', marginBottom: '16px'}}>Request New Withdrawal</h3>
@@ -133,16 +190,11 @@ const MobilePayoutPage: React.FC = () => {
                 <div style={{display: 'flex', flexDirection: 'column', gap: '16px'}}>
                   <div>
                     <label style={{fontSize: '14px', color: 'rgba(255,255,255,0.8)', display: 'block', marginBottom: '8px'}}>
-                      Available Balance
-                    </label>
-                    <div style={{fontSize: '20px', fontWeight: '700', color: '#FFD700'}}>₦450,000</div>
-                  </div>
-
-                  <div>
-                    <label style={{fontSize: '14px', color: 'rgba(255,255,255,0.8)', display: 'block', marginBottom: '8px'}}>
-                      Funded MT5 Account
+                      Select Account
                     </label>
                     <select
+                      value={selectedAccountId || ''}
+                      onChange={(e) => setSelectedAccountId(e.target.value ? parseInt(e.target.value) : null)}
                       style={{
                         width: '100%',
                         padding: '12px 16px',
@@ -153,73 +205,99 @@ const MobilePayoutPage: React.FC = () => {
                         fontSize: '16px',
                         outline: 'none'
                       }}
+                      required
                     >
-                      <option value="200k">200k Account - Balance: ₦150,000</option>
+                      <option value="" disabled>Select an account to withdraw from</option>
+                      {payoutData.funded_accounts.map((account) => {
+                        const canWithdraw = account.available_payout >= account.minimum_withdrawal_amount
+                        return (
+                          <option
+                            key={account.account_id}
+                            value={account.account_id}
+                            disabled={!canWithdraw}
+                            style={{ color: canWithdraw ? 'white' : 'rgba(255,255,255,0.5)' }}
+                          >
+                            {account.account_size} - Available: {formatCurrency(account.available_payout)}
+                            {!canWithdraw && ` (Min: ${formatCurrency(account.minimum_withdrawal_amount)})`}
+                          </option>
+                        )
+                      })}
                     </select>
                   </div>
 
+                  {payoutData.eligibility.has_verified_bank_account && (
+                    <div>
+                      <label style={{fontSize: '14px', color: 'rgba(255,255,255,0.8)', display: 'block', marginBottom: '8px'}}>
+                        Payout Destination
+                      </label>
+                      <div style={{display: 'flex', alignItems: 'center', padding: '12px', background: 'rgba(255,255,255,0.05)', borderRadius: '8px'}}>
+                        <i className="fas fa-university" style={{color: '#FFD700', marginRight: '12px'}}></i>
+                        <span style={{color: 'white', fontSize: '14px'}}>****{payoutData.eligibility.bank_account_masked}</span>
+                      </div>
+                    </div>
+                  )}
+
                   <button
                     onClick={handleOpenPinModal}
+                    disabled={!payoutData.eligibility.is_eligible}
                     style={{
                       width: '100%',
-                      background: 'rgba(255,215,0,0.8)',
-                      color: 'black',
+                      background: payoutData.eligibility.is_eligible ? 'rgba(255,215,0,0.8)' : 'rgba(255,255,255,0.2)',
+                      color: payoutData.eligibility.is_eligible ? 'black' : 'rgba(255,255,255,0.5)',
                       border: 'none',
                       borderRadius: '12px',
                       padding: '16px',
                       fontSize: '16px',
                       fontWeight: '600',
-                      cursor: 'pointer',
+                      cursor: payoutData.eligibility.is_eligible ? 'pointer' : 'not-allowed',
                       marginTop: '8px'
                     }}
                   >
-                    Request Withdrawal
+                    {payoutData.eligibility.is_eligible ? 'Request Withdrawal' : 'Not Eligible'}
                   </button>
                 </div>
               </div>
             </div>
           )}
 
-          {activeTab === 'history' && (
+          {activeTab === 'history' && payoutData && (
             <div className="mobile-payout-card">
               <div className="mobile-payout-card-inner">
                 <h3 style={{fontSize: '18px', fontWeight: '600', color: 'white', marginBottom: '16px'}}>Withdrawal History</h3>
 
-                <div style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
-                  {/* Sample withdrawal items */}
-                  <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px', background: 'rgba(255,255,255,0.05)', borderRadius: '8px'}}>
-                    <div>
-                      <div style={{fontSize: '16px', fontWeight: '600', color: 'white'}}>₦150,000</div>
-                      <div style={{fontSize: '12px', color: 'rgba(255,255,255,0.6)'}}>Dec 15, 2024</div>
-                    </div>
-                    <div style={{textAlign: 'right'}}>
-                      <div style={{fontSize: '14px', color: '#FFD700', fontWeight: '600'}}>Completed</div>
-                      <div style={{fontSize: '12px', color: 'rgba(255,255,255,0.5)'}}>2.5 hrs</div>
-                    </div>
+                {payoutData.withdrawal_history.length === 0 ? (
+                  <div style={{textAlign: 'center', padding: '40px 20px'}}>
+                    <i className="fas fa-history" style={{fontSize: '48px', color: 'rgba(255,255,255,0.3)', marginBottom: '16px'}}></i>
+                    <p style={{color: 'rgba(255,255,255,0.8)', fontSize: '16px', marginBottom: '8px'}}>No withdrawal history yet</p>
+                    <span style={{color: 'rgba(255,255,255,0.6)', fontSize: '14px'}}>Your completed withdrawals will appear here</span>
                   </div>
-
-                  <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px', background: 'rgba(255,255,255,0.05)', borderRadius: '8px'}}>
-                    <div>
-                      <div style={{fontSize: '16px', fontWeight: '600', color: 'white'}}>₦200,000</div>
-                      <div style={{fontSize: '12px', color: 'rgba(255,255,255,0.6)'}}>Dec 10, 2024</div>
-                    </div>
-                    <div style={{textAlign: 'right'}}>
-                      <div style={{fontSize: '14px', color: '#FFD700', fontWeight: '600'}}>Completed</div>
-                      <div style={{fontSize: '12px', color: 'rgba(255,255,255,0.5)'}}>3.2 hrs</div>
-                    </div>
+                ) : (
+                  <div style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
+                    {payoutData.withdrawal_history.map((withdrawal) => (
+                      <div key={withdrawal.id} style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px', background: 'rgba(255,255,255,0.05)', borderRadius: '8px'}}>
+                        <div>
+                          <div style={{fontSize: '16px', fontWeight: '600', color: 'white'}}>{formatCurrency(withdrawal.amount)}</div>
+                          <div style={{fontSize: '12px', color: 'rgba(255,255,255,0.6)'}}>{formatDate(withdrawal.requested_at)}</div>
+                          {withdrawal.reference && (
+                            <div style={{fontSize: '10px', color: 'rgba(255,255,255,0.5)'}}>Ref: {withdrawal.reference}</div>
+                          )}
+                        </div>
+                        <div style={{textAlign: 'right'}}>
+                          <div style={{
+                            fontSize: '14px',
+                            fontWeight: '600',
+                            color: withdrawal.status === 'completed' ? '#FFD700' : withdrawal.status === 'processing' ? '#FFA500' : '#FF6B6B'
+                          }}>
+                            {withdrawal.status.charAt(0).toUpperCase() + withdrawal.status.slice(1)}
+                          </div>
+                          <div style={{fontSize: '12px', color: 'rgba(255,255,255,0.5)'}}>
+                            {formatTimeAgo(withdrawal.completed_at || withdrawal.requested_at)}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-
-                  <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px', background: 'rgba(255,255,255,0.05)', borderRadius: '8px'}}>
-                    <div>
-                      <div style={{fontSize: '16px', fontWeight: '600', color: 'white'}}>₦100,000</div>
-                      <div style={{fontSize: '12px', color: 'rgba(255,255,255,0.6)'}}>Dec 8, 2024</div>
-                    </div>
-                    <div style={{textAlign: 'right'}}>
-                      <div style={{fontSize: '14px', color: '#FFD700', fontWeight: '600'}}>Completed</div>
-                      <div style={{fontSize: '12px', color: 'rgba(255,255,255,0.5)'}}>1.8 hrs</div>
-                    </div>
-                  </div>
-                </div>
+                )}
               </div>
             </div>
           )}
@@ -244,8 +322,17 @@ const MobilePayoutPage: React.FC = () => {
             />
             {pinError && <div className="mobile-pin-modal-error">{pinError}</div>}
             <div className="mobile-pin-modal-actions">
-              <button className="mobile-pin-cancel-btn" onClick={handleClosePinModal}>Cancel</button>
-              <button className="mobile-pin-confirm-btn" onClick={handleConfirmPin}>Verify PIN</button>
+              <button className="mobile-pin-cancel-btn" onClick={handleClosePinModal} disabled={verifyingPin}>Cancel</button>
+              <button className="mobile-pin-confirm-btn" onClick={handleConfirmPin} disabled={verifyingPin}>
+                {verifyingPin ? (
+                  <>
+                    <i className="fas fa-spinner fa-spin" style={{marginRight: '8px'}}></i>
+                    Verifying...
+                  </>
+                ) : (
+                  'Verify PIN'
+                )}
+              </button>
             </div>
           </div>
         </div>

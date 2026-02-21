@@ -1,15 +1,61 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import MobileDashboardHeader from '../components/MobileDashboardHeader'
 import MobileDashboardBalanceOverview from '../components/MobileDashboardBalanceOverview'
-import MobileAnalysis from '../components/MobileAnalysis'
 import MobileTradingObjective from '../components/MobileTradingObjective'
 import MobileStatsPerformance from '../components/MobileStatsPerformance'
 import MobileDailySummary from '../components/MobileDailySummary'
 import MobileCredentials from '../components/MobileCredentials'
+import { fetchUserChallengeAccountDetail, type UserChallengeAccountDetailResponse } from '../lib/auth'
 import '../styles/MobileAccountDetailsPage.css'
 
 const MobileAccountDetailsPage: React.FC = () => {
+  const [searchParams] = useSearchParams()
   const [activeTab, setActiveTab] = useState('Overview')
+  const [accountData, setAccountData] = useState<UserChallengeAccountDetailResponse | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  const challengeId = searchParams.get('challenge_id')
+
+  useEffect(() => {
+    if (!challengeId) {
+      setError('Challenge ID is required')
+      setLoading(false)
+      return
+    }
+
+    setLoading(true)
+    setError('')
+    fetchUserChallengeAccountDetail(challengeId)
+      .then((data) => {
+        setAccountData(data)
+      })
+      .catch((err: unknown) => {
+        setError(err instanceof Error ? err.message : 'Failed to load account details')
+      })
+      .finally(() => setLoading(false))
+  }, [challengeId])
+
+  if (loading) {
+    return (
+      <div className="mobile-account-details-page">
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', color: 'white' }}>
+          Loading account details...
+        </div>
+      </div>
+    )
+  }
+
+  if (error || !accountData) {
+    return (
+      <div className="mobile-account-details-page">
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', color: '#ff8b8b' }}>
+          {error || 'Account not found'}
+        </div>
+      </div>
+    )
+  }
 
   const renderContent = () => {
     switch (activeTab) {
@@ -17,13 +63,15 @@ const MobileAccountDetailsPage: React.FC = () => {
         return (
           <>
             <div className="mobile-account-details-card">
-              <MobileDashboardBalanceOverview />
+              <MobileDashboardBalanceOverview
+                balance={accountData.metrics.balance}
+                equity={accountData.metrics.equity}
+                unrealizedPnl={accountData.metrics.unrealized_pnl}
+                maxPermittedLossLeft={accountData.metrics.max_permitted_loss_left}
+              />
             </div>
             <div className="mobile-account-details-card mobile-account-details-card-spaced">
-              <MobileAnalysis />
-            </div>
-            <div className="mobile-account-details-card mobile-account-details-card-spaced">
-              <MobileTradingObjective />
+              <MobileTradingObjective objectives={accountData.objectives} />
             </div>
           </>
         )
@@ -41,9 +89,16 @@ const MobileAccountDetailsPage: React.FC = () => {
       case 'Account':
         return (
           <>
-            <div className="mobile-account-details-card">
-              <MobileCredentials />
-            </div>
+            {accountData.credentials && (
+              <div className="mobile-account-details-card">
+                <MobileCredentials
+                  server={accountData.credentials.server}
+                  accountNumber={accountData.credentials.account_number}
+                  password={accountData.credentials.password}
+                  investorPassword={accountData.credentials.investor_password}
+                />
+              </div>
+            )}
           </>
         )
       default:

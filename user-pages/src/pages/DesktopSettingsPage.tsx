@@ -1,8 +1,9 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import DesktopHeader from '../components/DesktopHeader'
 import DesktopSidebar from '../components/DesktopSidebar'
 import DesktopFooter from '../components/DesktopFooter'
 import '../styles/DesktopSettingsPage.css'
+import { changePin, getPinStatus, resetPin, sendPinOtp, setPin, fetchProfile, updateCertificateNameSetting } from '../lib/auth'
 
 type PinModalType = 'set' | 'change' | 'reset' | null
 
@@ -17,6 +18,24 @@ const DesktopSettingsPage: React.FC = () => {
     otp: ''
   })
   const [pinFormError, setPinFormError] = useState('')
+  const [pinFormSuccess, setPinFormSuccess] = useState('')
+  const [pinLoading, setPinLoading] = useState(false)
+  const [hasPin, setHasPin] = useState<boolean | null>(null)
+
+  useEffect(() => {
+    getPinStatus()
+      .then((status) => setHasPin(status.has_pin))
+      .catch(() => setHasPin(false))
+
+    // Load current certificate name setting
+    fetchProfile()
+      .then((profile) => {
+        setUseNickNameForCertificates(profile.use_nickname_for_certificates || false)
+      })
+      .catch(() => {
+        setUseNickNameForCertificates(false)
+      })
+  }, [])
 
   const handleThemeToggle = () => {
     setIsDarkMode(!isDarkMode)
@@ -31,7 +50,12 @@ const DesktopSettingsPage: React.FC = () => {
 
   const handleOpenPinModal = (type: Exclude<PinModalType, null>) => {
     resetPinForm()
+    setPinFormSuccess('')
     setActivePinModal(type)
+
+    getPinStatus()
+      .then((status) => setHasPin(status.has_pin))
+      .catch(() => setHasPin(null))
   }
 
   const handleClosePinModal = () => {
@@ -51,8 +75,16 @@ const DesktopSettingsPage: React.FC = () => {
     handleOpenPinModal('reset')
   }
 
-  const handleNickNameToggle = () => {
-    setUseNickNameForCertificates(!useNickNameForCertificates)
+  const handleNickNameToggle = async () => {
+    const newValue = !useNickNameForCertificates
+    try {
+      await updateCertificateNameSetting(newValue)
+      setUseNickNameForCertificates(newValue)
+    } catch (error) {
+      console.error('Failed to update certificate name setting:', error)
+      // Revert the UI change on error
+      setUseNickNameForCertificates(useNickNameForCertificates)
+    }
   }
 
   const handlePinFieldChange = (field: keyof typeof pinForm, value: string) => {
@@ -62,7 +94,7 @@ const DesktopSettingsPage: React.FC = () => {
     if (pinFormError) setPinFormError('')
   }
 
-  const handleSubmitPinModal = () => {
+  const handleSubmitPinModal = async () => {
     if (activePinModal === 'set') {
       if (!/^\d{4}$/.test(pinForm.newPin)) return setPinFormError('New PIN must be 4 digits')
       if (pinForm.confirmPin !== pinForm.newPin) return setPinFormError('PIN confirmation does not match')
@@ -80,12 +112,66 @@ const DesktopSettingsPage: React.FC = () => {
       if (pinForm.confirmPin !== pinForm.newPin) return setPinFormError('PIN confirmation does not match')
     }
 
-    console.log('PIN action submitted:', activePinModal, pinForm)
-    handleClosePinModal()
+    setPinLoading(true)
+    setPinFormError('')
+    setPinFormSuccess('')
+
+    try {
+      if (activePinModal === 'set') {
+        const response = await setPin({
+          new_pin: pinForm.newPin,
+          confirm_pin: pinForm.confirmPin,
+          otp: pinForm.otp,
+        })
+        setPinFormSuccess(response.message)
+        setHasPin(true)
+      }
+
+      if (activePinModal === 'change') {
+        const response = await changePin({
+          old_pin: pinForm.oldPin,
+          new_pin: pinForm.newPin,
+        })
+        setPinFormSuccess(response.message)
+      }
+
+      if (activePinModal === 'reset') {
+        const response = await resetPin({
+          otp: pinForm.otp,
+          new_pin: pinForm.newPin,
+          confirm_pin: pinForm.confirmPin,
+        })
+        setPinFormSuccess(response.message)
+        setHasPin(true)
+      }
+
+      setTimeout(() => handleClosePinModal(), 600)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'PIN action failed'
+      setPinFormError(message)
+    } finally {
+      setPinLoading(false)
+    }
   }
 
-  const handleSendOtp = () => {
-    console.log('Send OTP clicked for:', activePinModal)
+  const handleSendOtp = async () => {
+    if (activePinModal !== 'set' && activePinModal !== 'reset') {
+      return
+    }
+
+    setPinLoading(true)
+    setPinFormError('')
+    setPinFormSuccess('')
+
+    try {
+      const response = await sendPinOtp(activePinModal)
+      setPinFormSuccess(response.message || 'OTP sent successfully. Check your email.')
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to send OTP'
+      setPinFormError(message)
+    } finally {
+      setPinLoading(false)
+    }
   }
 
 
@@ -171,38 +257,44 @@ const DesktopSettingsPage: React.FC = () => {
               <h2 className="section-title">Security</h2>
             </div>
 
-            <button className="settings-action-item" onClick={handleSetPin}>
-              <div className="settings-action-left">
-                <i className="fas fa-key settings-action-icon"></i>
-                <div className="settings-action-text">
-                  <h3>Set PIN</h3>
-                  <p>Create transaction PIN for secure actions</p>
+            {hasPin === false && (
+              <button className="settings-action-item settings-action-item-last" onClick={handleSetPin}>
+                <div className="settings-action-left">
+                  <i className="fas fa-key settings-action-icon"></i>
+                  <div className="settings-action-text">
+                    <h3>Set PIN</h3>
+                    <p>Create transaction PIN for secure actions</p>
+                  </div>
                 </div>
-              </div>
-              <i className="fas fa-chevron-right settings-action-chevron"></i>
-            </button>
+                <i className="fas fa-chevron-right settings-action-chevron"></i>
+              </button>
+            )}
 
-            <button className="settings-action-item" onClick={handleChangePin}>
-              <div className="settings-action-left">
-                <i className="fas fa-pen settings-action-icon"></i>
-                <div className="settings-action-text">
-                  <h3>Change PIN</h3>
-                  <p>Update your current transaction PIN</p>
-                </div>
-              </div>
-              <i className="fas fa-chevron-right settings-action-chevron"></i>
-            </button>
+            {hasPin === true && (
+              <>
+                <button className="settings-action-item" onClick={handleChangePin}>
+                  <div className="settings-action-left">
+                    <i className="fas fa-pen settings-action-icon"></i>
+                    <div className="settings-action-text">
+                      <h3>Change PIN</h3>
+                      <p>Update your current transaction PIN</p>
+                    </div>
+                  </div>
+                  <i className="fas fa-chevron-right settings-action-chevron"></i>
+                </button>
 
-            <button className="settings-action-item settings-action-item-last" onClick={handleResetPin}>
-              <div className="settings-action-left">
-                <i className="fas fa-rotate-left settings-action-icon"></i>
-                <div className="settings-action-text">
-                  <h3>Reset PIN</h3>
-                  <p>Recover access if you forgot your PIN</p>
-                </div>
-              </div>
-              <i className="fas fa-chevron-right settings-action-chevron"></i>
-            </button>
+                <button className="settings-action-item settings-action-item-last" onClick={handleResetPin}>
+                  <div className="settings-action-left">
+                    <i className="fas fa-rotate-left settings-action-icon"></i>
+                    <div className="settings-action-text">
+                      <h3>Reset PIN</h3>
+                      <p>Recover access if you forgot your PIN</p>
+                    </div>
+                  </div>
+                  <i className="fas fa-chevron-right settings-action-chevron"></i>
+                </button>
+              </>
+            )}
           </div>
 
 
@@ -273,10 +365,13 @@ const DesktopSettingsPage: React.FC = () => {
             </div>
 
             {pinFormError && <div className="settings-pin-error">{pinFormError}</div>}
+            {pinFormSuccess && <div className="settings-pin-error" style={{ color: '#16a34a', borderColor: 'rgba(22,163,74,0.35)', background: 'rgba(22,163,74,0.12)' }}>{pinFormSuccess}</div>}
 
             <div className="settings-pin-actions">
-              <button className="settings-pin-cancel" onClick={handleClosePinModal}>Cancel</button>
-              <button className="settings-pin-submit" onClick={handleSubmitPinModal}>Continue</button>
+              <button className="settings-pin-cancel" onClick={handleClosePinModal} disabled={pinLoading}>Cancel</button>
+              <button className="settings-pin-submit" onClick={handleSubmitPinModal} disabled={pinLoading}>
+                {pinLoading ? 'Please wait...' : 'Continue'}
+              </button>
             </div>
           </div>
         </div>

@@ -1,7 +1,26 @@
-import React from 'react'
+import React, { useState } from 'react'
 import '../styles/MobileCredentials.css'
 
-const MobileCredentials: React.FC = () => {
+interface MobileCredentialsProps {
+  server: string
+  accountNumber: string
+  password: string
+  investorPassword: string
+}
+
+const MobileCredentials: React.FC<MobileCredentialsProps> = ({
+  server,
+  accountNumber,
+  password,
+  investorPassword,
+}) => {
+  const [showPassword, setShowPassword] = useState(false)
+  const [showInvestorPassword, setShowInvestorPassword] = useState(false)
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text)
+  }
+
   return (
     <div className="section">
       <div className="credentials-title">
@@ -20,10 +39,10 @@ const MobileCredentials: React.FC = () => {
             </div>
             <div className="cred-info">
               <span className="cred-label">Server</span>
-              <span className="cred-value">ICMarkets-Live06</span>
+              <span className="cred-value">{server}</span>
             </div>
           </div>
-          <div className="cred-badge">
+          <div className="cred-badge" onClick={() => copyToClipboard(server)} style={{cursor: 'pointer'}}>
             <i className="fas fa-copy"></i> copy
           </div>
         </div>
@@ -34,11 +53,11 @@ const MobileCredentials: React.FC = () => {
             </div>
             <div className="cred-info">
               <span className="cred-label">Password</span>
-              <span className="cred-value">•••••••••••</span>
+              <span className="cred-value">{showPassword ? password : '•'.repeat(password.length)}</span>
             </div>
           </div>
-          <div className="cred-badge">
-            <i className="fas fa-eye"></i> show
+          <div className="cred-badge" onClick={() => setShowPassword(!showPassword)} style={{cursor: 'pointer'}}>
+            <i className={`fas fa-${showPassword ? 'eye-slash' : 'eye'}`}></i> {showPassword ? 'hide' : 'show'}
           </div>
         </div>
         <div className="credential-row">
@@ -48,10 +67,10 @@ const MobileCredentials: React.FC = () => {
             </div>
             <div className="cred-info">
               <span className="cred-label">Account No.</span>
-              <span className="cred-value">81054239</span>
+              <span className="cred-value">{accountNumber}</span>
             </div>
           </div>
-          <div className="cred-badge">
+          <div className="cred-badge" onClick={() => copyToClipboard(accountNumber)} style={{cursor: 'pointer'}}>
             <i className="fas fa-copy"></i> copy
           </div>
         </div>
@@ -62,11 +81,11 @@ const MobileCredentials: React.FC = () => {
             </div>
             <div className="cred-info">
               <span className="cred-label">Investors pass</span>
-              <span className="cred-value">••••••••</span>
+              <span className="cred-value">{showInvestorPassword ? investorPassword : '•'.repeat(investorPassword.length)}</span>
             </div>
           </div>
-          <div className="cred-badge">
-            <i className="fas fa-eye"></i> show
+          <div className="cred-badge" onClick={() => setShowInvestorPassword(!showInvestorPassword)} style={{cursor: 'pointer'}}>
+            <i className={`fas fa-${showInvestorPassword ? 'eye-slash' : 'eye'}`}></i> {showInvestorPassword ? 'hide' : 'show'}
           </div>
         </div>
       </div>

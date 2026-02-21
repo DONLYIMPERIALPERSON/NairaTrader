@@ -1,7 +1,12 @@
 import React from 'react'
 import DesktopAccountCard from './DesktopAccountCard'
+import type { UserChallengeAccountListItem } from '../lib/auth'
 
-const DesktopHistorySection: React.FC = () => {
+type DesktopHistorySectionProps = {
+  accounts: UserChallengeAccountListItem[]
+}
+
+const DesktopHistorySection: React.FC<DesktopHistorySectionProps> = ({ accounts }) => {
   return (
     <div>
       <h2 style={{
@@ -17,34 +22,22 @@ const DesktopHistorySection: React.FC = () => {
         flexDirection: 'column',
         gap: '16px'
       }}>
-        <DesktopAccountCard
-          phase="Phase 1"
-          accountNumber="42719035"
-          startDate="15 Jan 2024"
-          amount="N25,000"
-          status="Passed"
-        />
-        <DesktopAccountCard
-          phase="Phase 2"
-          accountNumber="67289451"
-          startDate="20 Mar 2024"
-          amount="N50,000"
-          status="Passed"
-        />
-        <DesktopAccountCard
-          phase="Phase 1"
-          accountNumber="12345678"
-          startDate="5 Dec 2023"
-          amount="N10,000"
-          status="Failed"
-        />
-        <DesktopAccountCard
-          phase="Phase 3"
-          accountNumber="99887766"
-          startDate="1 Nov 2023"
-          amount="N75,000"
-          status="Passed"
-        />
+        {accounts.length === 0 ? (
+          <div style={{ background: 'white', border: '1px solid #e0e0e0', borderRadius: '12px', padding: '20px', color: '#666' }}>
+            No account history yet.
+          </div>
+        ) : accounts.map((account) => (
+          <DesktopAccountCard
+            key={account.challenge_id}
+            challengeId={account.challenge_id}
+            phase={account.phase}
+            accountNumber={account.mt5_account ?? 'Pending'}
+            startDate={account.started_at ? new Date(account.started_at).toLocaleDateString() : '-'}
+            amount={account.account_size}
+            status={(account.display_status as 'Active' | 'Ready' | 'Passed' | 'Failed')}
+            passedStage={account.passed_stage}
+          />
+        ))}
       </div>
     </div>
   )

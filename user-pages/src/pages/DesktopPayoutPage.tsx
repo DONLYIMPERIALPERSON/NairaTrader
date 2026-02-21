@@ -1,14 +1,38 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import DesktopHeader from '../components/DesktopHeader'
 import DesktopSidebar from '../components/DesktopSidebar'
 import DesktopFooter from '../components/DesktopFooter'
 import '../styles/DesktopPayoutPage.css'
+import { payoutAPI, formatCurrency, formatDate, formatTimeAgo, type PayoutSummaryResponse } from '../lib/payout'
 
 const DesktopPayoutPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'request' | 'history'>('request')
   const [showPinModal, setShowPinModal] = useState(false)
   const [pinCode, setPinCode] = useState('')
   const [pinError, setPinError] = useState('')
+  const [payoutData, setPayoutData] = useState<PayoutSummaryResponse | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [selectedAccountId, setSelectedAccountId] = useState<number | null>(null)
+  const [verifyingPin, setVerifyingPin] = useState(false)
+
+  useEffect(() => {
+    const fetchPayoutData = async () => {
+      try {
+        setLoading(true)
+        setError(null)
+        const data = await payoutAPI.getPayoutSummary()
+        setPayoutData(data)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load payout data')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchPayoutData()
+  }, [])
 
   const handleOpenPinModal = () => {
     setPinCode('')
@@ -22,16 +46,39 @@ const DesktopPayoutPage: React.FC = () => {
     setPinError('')
   }
 
-  const handleConfirmPin = () => {
+  const handleConfirmPin = async () => {
     if (!/^\d{4}$/.test(pinCode)) {
       setPinError('Enter a valid 4-digit PIN')
       return
     }
 
-    setShowPinModal(false)
-    setPinCode('')
-    setPinError('')
-    alert('PIN verified. Withdrawal request submitted.')
+    if (!selectedAccountId) {
+      setPinError('Please select an account')
+      return
+    }
+
+    // Find the selected account to get the available payout amount
+    const selectedAccount = payoutData?.funded_accounts.find(acc => acc.account_id === selectedAccountId)
+    if (!selectedAccount) {
+      setPinError('Selected account not found')
+      return
+    }
+
+    try {
+      setVerifyingPin(true)
+      setPinError('')
+      const response = await payoutAPI.requestPayout(selectedAccount.available_payout, selectedAccountId)
+      setShowPinModal(false)
+      setPinCode('')
+      alert(response.message || 'Withdrawal request submitted successfully!')
+      // Refresh payout data
+      const data = await payoutAPI.getPayoutSummary()
+      setPayoutData(data)
+    } catch (error) {
+      setPinError(error instanceof Error ? error.message : 'Failed to submit withdrawal request')
+    } finally {
+      setVerifyingPin(false)
+    }
   }
 
   return (
@@ -53,36 +100,54 @@ const DesktopPayoutPage: React.FC = () => {
           <p>Request and track your payouts</p>
         </div>
 
-        {/* Stats Cards */}
-        <div className="stats-grid">
-          {/* Total Withdrawn */}
-          <div className="stat-card">
-            <div className="stat-card-header">
-              <div className="stat-icon">
-                <i className="fas fa-wallet"></i>
-              </div>
-              <div className="stat-content">
-                <div className="stat-label">Total Withdrawn</div>
-                <div className="stat-value">₦2,450,000</div>
-                <div className="stat-subtitle">All-time</div>
-              </div>
-            </div>
+        {/* Loading/Error States */}
+        {loading && (
+          <div className="loading-state">
+            <div className="loading-spinner"></div>
+            <p>Loading payout information...</p>
           </div>
+        )}
 
-          {/* Last Withdrawal */}
-          <div className="stat-card">
-            <div className="stat-card-header">
-              <div className="stat-icon">
-                <i className="fas fa-clock"></i>
+        {error && (
+          <div className="error-state">
+            <i className="fas fa-exclamation-triangle"></i>
+            <p>{error}</p>
+            <button onClick={() => window.location.reload()}>Retry</button>
+          </div>
+        )}
+
+        {/* Stats Cards */}
+        {payoutData && (
+          <div className="stats-grid">
+            {/* Total Earned All Time */}
+            <div className="stat-card">
+              <div className="stat-card-header">
+                <div className="stat-icon">
+                  <i className="fas fa-trophy"></i>
+                </div>
+                <div className="stat-content">
+                  <div className="stat-label">Total Earned</div>
+                  <div className="stat-value">{formatCurrency(payoutData.total_earned_all_time)}</div>
+                  <div className="stat-subtitle">All-time earnings</div>
+                </div>
               </div>
-              <div className="stat-content">
-                <div className="stat-label">Last Withdrawal</div>
-                <div className="stat-value">₦150,000</div>
-                <div className="stat-subtitle">2.5 hrs ago</div>
+            </div>
+
+            {/* Available Payout */}
+            <div className="stat-card">
+              <div className="stat-card-header">
+                <div className="stat-icon">
+                  <i className="fas fa-money-bill-wave"></i>
+                </div>
+                <div className="stat-content">
+                  <div className="stat-label">Available Payout</div>
+                  <div className="stat-value">{formatCurrency(payoutData.total_available_payout)}</div>
+                  <div className="stat-subtitle">Ready to withdraw</div>
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        )}
 
         {/* Tabs */}
         <div className="tabs-section">
@@ -102,87 +167,118 @@ const DesktopPayoutPage: React.FC = () => {
           </div>
 
           {/* Tab Content */}
-          {activeTab === 'request' && (
+          {activeTab === 'request' && payoutData && (
             <div>
               <h3 className="tab-content">Request New Withdrawal</h3>
 
               <div className="request-form">
-                {/* Available Balance */}
-                <div className="balance-card">
-                  <label className="balance-label">Available Balance</label>
-                  <div className="balance-value">₦450,000</div>
-                </div>
-
                 {/* Funded MT5 Account */}
                 <div className="account-select">
-                  <label className="balance-label">Funded MT5 Account</label>
-                  <select className="account-select select">
-                    <option value="200k">200k Account - Balance: ₦150,000</option>
+                  <label className="balance-label">Select Account</label>
+                  <select
+                    className="account-select select"
+                    value={selectedAccountId || ''}
+                    onChange={(e) => setSelectedAccountId(e.target.value ? parseInt(e.target.value) : null)}
+                    required
+                  >
+                    <option value="" disabled>Select an account to withdraw from</option>
+                    {payoutData.funded_accounts.map((account) => {
+                      const canWithdraw = account.available_payout >= account.minimum_withdrawal_amount
+                      return (
+                        <option
+                          key={account.account_id}
+                          value={account.account_id}
+                          disabled={!canWithdraw}
+                        >
+                          {account.account_size} - Available: {formatCurrency(account.available_payout)}
+                          {!canWithdraw && ` (Min: ${formatCurrency(account.minimum_withdrawal_amount)})`}
+                        </option>
+                      )
+                    })}
                   </select>
                 </div>
 
+                {/* Bank Account Info */}
+                {payoutData.eligibility.has_verified_bank_account && (
+                  <div className="bank-info">
+                    <label className="balance-label">Payout Destination</label>
+                    <div className="bank-details">
+                      <i className="fas fa-university"></i>
+                      <span>****{payoutData.eligibility.bank_account_masked}</span>
+                    </div>
+                  </div>
+                )}
+
                 {/* Request Button */}
                 <div className="request-button-container">
-                  <button className="request-button" onClick={handleOpenPinModal}>Request Withdrawal</button>
+                  <button
+                    className="request-button"
+                    onClick={handleOpenPinModal}
+                    disabled={!payoutData.eligibility.is_eligible}
+                  >
+                    {payoutData.eligibility.is_eligible ? 'Request Withdrawal' : 'Not Eligible'}
+                  </button>
                 </div>
+
+                {/* Ineligibility Reasons */}
+                {!payoutData.eligibility.is_eligible && payoutData.eligibility.ineligibility_reasons.length > 0 && (
+                  <div className="ineligibility-reasons">
+                    <div className="ineligibility-header">
+                      <i className="fas fa-info-circle"></i>
+                      <span>Why you're not eligible for withdrawal:</span>
+                    </div>
+                    <ul className="ineligibility-list">
+                      {payoutData.eligibility.ineligibility_reasons.map((reason, index) => (
+                        <li key={index} className="ineligibility-item">
+                          <i className="fas fa-exclamation-triangle"></i>
+                          {reason}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
             </div>
           )}
 
-          {activeTab === 'history' && (
+          {activeTab === 'history' && payoutData && (
             <div>
               <h3 className="tab-content">Withdrawal History</h3>
 
-              <div className="history-list">
-                {/* History Items */}
-                <div className="history-item">
-                  <div className="history-item-left">
-                    <div className="history-icon">
-                      <i className="fas fa-check"></i>
-                    </div>
-                    <div className="history-details">
-                      <div className="history-amount">₦150,000</div>
-                      <div className="history-date">Dec 15, 2024</div>
-                    </div>
-                  </div>
-                  <div className="history-item-right">
-                    <div className="history-status">Completed</div>
-                    <div className="history-time">2.5 hrs ago</div>
-                  </div>
+              {payoutData.withdrawal_history.length === 0 ? (
+                <div className="empty-history">
+                  <i className="fas fa-history"></i>
+                  <p>No withdrawal history yet</p>
+                  <span>Your completed withdrawals will appear here</span>
                 </div>
-
-                <div className="history-item">
-                  <div className="history-item-left">
-                    <div className="history-icon">
-                      <i className="fas fa-check"></i>
+              ) : (
+                <div className="history-list">
+                  {payoutData.withdrawal_history.map((withdrawal) => (
+                    <div key={withdrawal.id} className="history-item">
+                      <div className="history-item-left">
+                        <div className="history-icon">
+                          <i className={`fas fa-${withdrawal.status === 'completed' ? 'check' : withdrawal.status === 'processing' ? 'clock' : 'times'}`}></i>
+                        </div>
+                        <div className="history-details">
+                          <div className="history-amount">{formatCurrency(withdrawal.amount)}</div>
+                          <div className="history-date">{formatDate(withdrawal.requested_at)}</div>
+                          {withdrawal.reference && (
+                            <div className="history-reference">Ref: {withdrawal.reference}</div>
+                          )}
+                        </div>
+                      </div>
+                      <div className="history-item-right">
+                        <div className={`history-status ${withdrawal.status}`}>
+                          {withdrawal.status.charAt(0).toUpperCase() + withdrawal.status.slice(1)}
+                        </div>
+                        <div className="history-time">
+                          {formatTimeAgo(withdrawal.completed_at || withdrawal.requested_at)}
+                        </div>
+                      </div>
                     </div>
-                    <div className="history-details">
-                      <div className="history-amount">₦200,000</div>
-                      <div className="history-date">Dec 10, 2024</div>
-                    </div>
-                  </div>
-                  <div className="history-item-right">
-                    <div className="history-status">Completed</div>
-                    <div className="history-time">3.2 hrs ago</div>
-                  </div>
+                  ))}
                 </div>
-
-                <div className="history-item">
-                  <div className="history-item-left">
-                    <div className="history-icon">
-                      <i className="fas fa-check"></i>
-                    </div>
-                    <div className="history-details">
-                      <div className="history-amount">₦100,000</div>
-                      <div className="history-date">Dec 8, 2024</div>
-                    </div>
-                  </div>
-                  <div className="history-item-right">
-                    <div className="history-status">Completed</div>
-                    <div className="history-time">1.8 hrs ago</div>
-                  </div>
-                </div>
-              </div>
+              )}
             </div>
           )}
         </div>
@@ -206,8 +302,17 @@ const DesktopPayoutPage: React.FC = () => {
             />
             {pinError && <div className="pin-modal-error">{pinError}</div>}
             <div className="pin-modal-actions">
-              <button className="pin-cancel-btn" onClick={handleClosePinModal}>Cancel</button>
-              <button className="pin-confirm-btn" onClick={handleConfirmPin}>Verify PIN</button>
+              <button className="pin-cancel-btn" onClick={handleClosePinModal} disabled={verifyingPin}>Cancel</button>
+              <button className="pin-confirm-btn" onClick={handleConfirmPin} disabled={verifyingPin}>
+                {verifyingPin ? (
+                  <>
+                    <i className="fas fa-spinner fa-spin" style={{marginRight: '8px'}}></i>
+                    Verifying...
+                  </>
+                ) : (
+                  'Verify PIN'
+                )}
+              </button>
             </div>
           </div>
         </div>

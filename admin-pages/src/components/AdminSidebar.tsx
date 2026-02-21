@@ -5,9 +5,11 @@ type AdminPage = 'analysis' | 'users' | 'accounts' | 'fundedAccounts' | 'breache
 interface AdminSidebarProps {
   activePage: AdminPage
   onNavigate: (page: AdminPage) => void
+  onLogout: () => void
+  isLoggingOut: boolean
 }
 
-const AdminSidebar = ({ activePage, onNavigate }: AdminSidebarProps) => {
+const AdminSidebar = ({ activePage, onNavigate, onLogout, isLoggingOut }: AdminSidebarProps) => {
   return (
     <aside className="admin-sidebar">
       <nav className="admin-sidebar-nav">
@@ -137,6 +139,12 @@ const AdminSidebar = ({ activePage, onNavigate }: AdminSidebarProps) => {
             onClick={() => onNavigate('settings')}
           >
             Settings
+          </button>
+        </div>
+
+        <div className="admin-sidebar-group">
+          <button className="admin-sidebar-logout" type="button" onClick={onLogout} disabled={isLoggingOut}>
+            {isLoggingOut ? 'Logging out...' : 'Logout'}
           </button>
         </div>
       </nav>

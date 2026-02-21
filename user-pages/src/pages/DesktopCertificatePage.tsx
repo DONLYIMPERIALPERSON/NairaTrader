@@ -1,43 +1,143 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import DesktopHeader from '../components/DesktopHeader'
 import DesktopSidebar from '../components/DesktopSidebar'
 import DesktopFooter from '../components/DesktopFooter'
+import { fetchCertificates, fetchProfile } from '../lib/auth'
 import '../styles/DesktopCertificatePage.css'
+
+interface Certificate {
+  id: number
+  certificate_type: string
+  title: string
+  description: string | null
+  certificate_url: string
+  generated_at: string
+  related_entity_id: string | null
+  certificate_metadata: string | null
+}
 
 const DesktopCertificatePage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'payout' | 'funded'>('funded')
+  const [certificates, setCertificates] = useState<Certificate[]>([])
+  const [loading, setLoading] = useState(true)
+  const [kycStatus, setKycStatus] = useState<string>('not_started')
 
-  const handleShare = (certificateId: string) => {
-    // Handle share functionality
-    console.log('Share certificate:', certificateId)
+  useEffect(() => {
+    fetchCertificatesData()
+    fetchKycStatus()
+  }, [])
+
+  const fetchCertificatesData = async () => {
+    try {
+      const data = await fetchCertificates()
+      setCertificates(data.certificates)
+    } catch (error) {
+      console.error('Error fetching certificates:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const fetchKycStatus = async () => {
+    try {
+      const profile = await fetchProfile()
+      setKycStatus(profile.kyc_status || 'not_started')
+    } catch (error) {
+      console.error('Error fetching KYC status:', error)
+    }
+  }
+
+  const handleShare = (certificate: Certificate) => {
     if (navigator.share) {
       navigator.share({
-        title: 'Trading Certificate',
-        text: 'Check out my trading achievement!',
-        url: window.location.href
+        title: certificate.title,
+        text: certificate.description || 'Check out my trading achievement!',
+        url: certificate.certificate_url
       })
     }
   }
 
-  const handleDownload = (certificateId: string) => {
-    // Handle download functionality
-    console.log('Download certificate:', certificateId)
-    // This would typically trigger a download
+  const handleDownload = (certificate: Certificate) => {
+    // Create a temporary link to download the certificate
+    const link = document.createElement('a')
+    link.href = certificate.certificate_url
+    link.download = `${certificate.title.replace(/\s+/g, '_')}.png`
+    link.target = '_blank' // Open in new tab if download doesn't work
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
   }
 
-  const payoutCertificates = [
-    { id: 'payout-1', title: 'First Payout Achievement', date: '15 Jan 2026', value: '₦50,000' },
-    { id: 'payout-2', title: 'Consistent Trader', date: '10 Dec 2025', value: '₦25,000' },
-    { id: 'payout-3', title: 'Profit Milestone', date: '5 Nov 2025', value: '₦100,000' }
-  ]
+  const filteredCertificates = certificates.filter(cert =>
+    activeTab === 'payout' ? cert.certificate_type === 'payout' : cert.certificate_type === 'funding'
+  )
 
-  const fundedCertificates = [
-    { id: 'funded-1', title: 'Challenge Completed', date: '20 Jan 2026', value: 'Standard Account' },
-    { id: 'funded-2', title: 'Funded Trader', date: '15 Dec 2025', value: 'Premium Account' },
-    { id: 'funded-3', title: 'Elite Status', date: '1 Nov 2025', value: 'VIP Account' }
-  ]
+  // Check if user is eligible (has completed KYC)
+  const KYC_COMPLETED_STATUSES = new Set(['verified', 'approved', 'completed'])
+  const isEligible = KYC_COMPLETED_STATUSES.has((kycStatus || '').toLowerCase())
 
-  const currentCertificates = activeTab === 'payout' ? payoutCertificates : fundedCertificates
+  if (loading) {
+    return (
+      <div className="certificate-page">
+        <DesktopHeader />
+        <DesktopSidebar />
+        <div style={{
+          marginLeft: '280px',
+          padding: '24px',
+          paddingTop: '80px',
+          minHeight: '100vh',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center'
+        }}>
+          <div>Loading certificates...</div>
+        </div>
+      </div>
+    )
+  }
+
+  // If user is not eligible (KYC not completed), show only the KYC warning
+  if (!isEligible) {
+    return (
+      <div className="certificate-page">
+        <DesktopHeader />
+        <DesktopSidebar />
+        <div style={{
+          marginLeft: '280px', // Account for sidebar
+          padding: '24px',
+          paddingTop: '80px', // Add top padding to avoid header overlap
+          minHeight: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}>
+          {/* KYC Warning - Full Page */}
+          <div className="kyc-warning" style={{
+            backgroundColor: '#fff3cd',
+            border: '1px solid #ffeaa7',
+            borderRadius: '8px',
+            padding: '32px',
+            maxWidth: '500px',
+            textAlign: 'center',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '16px'
+          }}>
+            <i className="fas fa-exclamation-triangle" style={{ color: '#856404', fontSize: '48px' }}></i>
+            <div>
+              <div style={{ fontWeight: 'bold', color: '#856404', fontSize: '24px', marginBottom: '8px' }}>
+                KYC Required
+              </div>
+              <div style={{ color: '#856404', fontSize: '16px', lineHeight: '1.5' }}>
+                Complete your KYC verification to access and generate certificates for your trading achievements.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="certificate-page">
@@ -96,30 +196,62 @@ const DesktopCertificatePage: React.FC = () => {
         </div>
 
         {/* Certificates Grid */}
-        {currentCertificates.length > 0 ? (
+        {filteredCertificates.length > 0 ? (
           <div className="certificates-grid">
-            {currentCertificates.map((cert) => (
+            {filteredCertificates.map((cert: Certificate) => (
               <div key={cert.id} className="certificate-card">
-                {/* Certificate Placeholder */}
-                <div className="certificate-placeholder">
-                  <i className="fas fa-certificate certificate-icon"></i>
-                  <div className="certificate-title">{cert.title}</div>
-                  <div className="certificate-date">{cert.date}</div>
-                  <div className="certificate-value">{cert.value}</div>
+                {/* Certificate Image */}
+                <div style={{
+                  background: 'linear-gradient(135deg, rgba(255,215,0,0.1) 0%, rgba(255,215,0,0.05) 100%)',
+                  border: '2px solid rgba(255,215,0,0.3)',
+                  borderRadius: '12px',
+                  padding: '16px',
+                  textAlign: 'center',
+                  marginBottom: '16px',
+                  overflow: 'hidden'
+                }}>
+                  <img
+                    src={cert.certificate_url}
+                    alt={cert.title}
+                    style={{
+                      width: '100%',
+                      height: 'auto',
+                      maxHeight: '250px',
+                      objectFit: 'contain',
+                      borderRadius: '8px',
+                      marginBottom: '12px'
+                    }}
+                    onError={(e) => {
+                      // Fallback to placeholder if image fails to load
+                      const target = e.target as HTMLImageElement;
+                      target.style.display = 'none';
+                      const parent = target.parentElement;
+                      if (parent) {
+                        parent.innerHTML = `
+                          <div style="padding: 24px; text-align: center;">
+                            <i class="fas fa-certificate" style="font-size: 48px; color: #FFD700; margin-bottom: 12px; opacity: 0.7;"></i>
+                            <div style="font-size: 18px; font-weight: 600; color: white; margin-bottom: 4px;">${cert.title}</div>
+                            <div style="font-size: 14px; color: rgba(255,255,255,0.6); margin-bottom: 8px;">${new Date(cert.generated_at).toLocaleDateString()}</div>
+                            <div style="font-size: 16px; font-weight: 600; color: #FFD700;">${cert.certificate_type === 'funding' ? 'Funded Account' : 'Payout'}</div>
+                          </div>
+                        `;
+                      }
+                    }}
+                  />
                 </div>
 
                 {/* Action Buttons */}
                 <div className="certificate-actions">
                   <button
                     className="action-button share-button"
-                    onClick={() => handleShare(cert.id)}
+                    onClick={() => handleShare(cert)}
                   >
                     <i className="fas fa-share"></i>
                     Share
                   </button>
                   <button
                     className="action-button download-button"
-                    onClick={() => handleDownload(cert.id)}
+                    onClick={() => handleDownload(cert)}
                   >
                     <i className="fas fa-download"></i>
                     Download

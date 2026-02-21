@@ -417,3 +417,53 @@
   background: #FFD700;
   color: #222;
 }
+
+/* Ineligibility Reasons */
+.ineligibility-reasons {
+  grid-column: 1 / -1;
+  background-color: #fff3cd;
+  border: 1px solid #ffeaa7;
+  border-radius: 8px;
+  padding: 20px;
+  margin-top: 16px;
+}
+
+.ineligibility-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #856404;
+}
+
+.ineligibility-header i {
+  color: #856404;
+  font-size: 18px;
+}
+
+.ineligibility-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.ineligibility-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 14px;
+  color: #856404;
+  line-height: 1.4;
+}
+
+.ineligibility-item:last-child {
+  margin-bottom: 0;
+}
+
+.ineligibility-item i {
+  margin-top: 2px;
+  flex-shrink: 0;
+}

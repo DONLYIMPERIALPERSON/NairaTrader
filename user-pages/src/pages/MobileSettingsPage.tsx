@@ -1,8 +1,8 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useDescope } from '@descope/react-sdk'
 import { useNavigate } from 'react-router-dom'
 import '../styles/MobileSettingsPage.css'
-import { clearPersistedAuthUser, logoutFromBackend } from '../lib/auth'
+import { changePin, clearPersistedAuthUser, getPinStatus, logoutFromBackend, resetPin, sendPinOtp, setPin } from '../lib/auth'
 
 type PinModalType = 'set' | 'change' | 'reset' | null
 
@@ -19,6 +19,15 @@ const MobileSettingsPage: React.FC = () => {
     otp: ''
   })
   const [pinFormError, setPinFormError] = useState('')
+  const [pinFormSuccess, setPinFormSuccess] = useState('')
+  const [pinLoading, setPinLoading] = useState(false)
+  const [hasPin, setHasPin] = useState<boolean | null>(null)
+
+  useEffect(() => {
+    getPinStatus()
+      .then((status) => setHasPin(status.has_pin))
+      .catch(() => setHasPin(false))
+  }, [])
 
   const handleBack = () => {
     navigate(-1)
@@ -54,7 +63,12 @@ const MobileSettingsPage: React.FC = () => {
 
   const handleOpenPinModal = (type: Exclude<PinModalType, null>) => {
     resetPinForm()
+    setPinFormSuccess('')
     setActivePinModal(type)
+
+    getPinStatus()
+      .then((status) => setHasPin(status.has_pin))
+      .catch(() => setHasPin(null))
   }
 
   const handleClosePinModal = () => {
@@ -85,7 +99,7 @@ const MobileSettingsPage: React.FC = () => {
     if (pinFormError) setPinFormError('')
   }
 
-  const handleSubmitPinModal = () => {
+  const handleSubmitPinModal = async () => {
     if (activePinModal === 'set') {
       if (!/^\d{4}$/.test(pinForm.newPin)) return setPinFormError('New PIN must be 4 digits')
       if (pinForm.confirmPin !== pinForm.newPin) return setPinFormError('PIN confirmation does not match')
@@ -103,12 +117,68 @@ const MobileSettingsPage: React.FC = () => {
       if (pinForm.confirmPin !== pinForm.newPin) return setPinFormError('PIN confirmation does not match')
     }
 
-    console.log('PIN action submitted:', activePinModal, pinForm)
-    handleClosePinModal()
+    setPinLoading(true)
+    setPinFormError('')
+    setPinFormSuccess('')
+
+    try {
+      if (activePinModal === 'set') {
+        const response = await setPin({
+          new_pin: pinForm.newPin,
+          confirm_pin: pinForm.confirmPin,
+          otp: pinForm.otp,
+        })
+        setPinFormSuccess(response.message)
+        setHasPin(true)
+      }
+
+      if (activePinModal === 'change') {
+        const response = await changePin({
+          old_pin: pinForm.oldPin,
+          new_pin: pinForm.newPin,
+        })
+        setPinFormSuccess(response.message)
+      }
+
+      if (activePinModal === 'reset') {
+        const response = await resetPin({
+          otp: pinForm.otp,
+          new_pin: pinForm.newPin,
+          confirm_pin: pinForm.confirmPin,
+        })
+        setPinFormSuccess(response.message)
+        setHasPin(true)
+      }
+
+      setTimeout(() => {
+        handleClosePinModal()
+      }, 600)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'PIN action failed'
+      setPinFormError(message)
+    } finally {
+      setPinLoading(false)
+    }
   }
 
-  const handleSendOtp = () => {
-    console.log('Send OTP clicked for:', activePinModal)
+  const handleSendOtp = async () => {
+    if (activePinModal !== 'set' && activePinModal !== 'reset') {
+      return
+    }
+
+    setPinLoading(true)
+    setPinFormError('')
+    setPinFormSuccess('')
+
+    try {
+      const response = await sendPinOtp(activePinModal)
+      setPinFormSuccess(response.message || 'OTP sent successfully. Check your email.')
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to send OTP'
+      setPinFormError(message)
+    } finally {
+      setPinLoading(false)
+    }
   }
 
   return (
@@ -236,38 +306,44 @@ const MobileSettingsPage: React.FC = () => {
           {/* PIN Settings */}
           <div className="mobile-settings-card" style={{marginBottom: '16px'}}>
             <div className="mobile-settings-card-inner">
-              <button className="mobile-settings-action-item" onClick={handleSetPin}>
-                <div className="mobile-settings-action-left">
-                  <i className="fas fa-key mobile-settings-action-icon"></i>
-                  <div className="mobile-settings-action-text">
-                    <div className="mobile-settings-action-title">Set PIN</div>
-                    <div className="mobile-settings-action-subtitle">Create transaction PIN</div>
+              {hasPin === false && (
+                <button className="mobile-settings-action-item mobile-settings-action-item-last" onClick={handleSetPin}>
+                  <div className="mobile-settings-action-left">
+                    <i className="fas fa-key mobile-settings-action-icon"></i>
+                    <div className="mobile-settings-action-text">
+                      <div className="mobile-settings-action-title">Set PIN</div>
+                      <div className="mobile-settings-action-subtitle">Create transaction PIN</div>
+                    </div>
                   </div>
-                </div>
-                <i className="fas fa-chevron-right mobile-settings-action-chevron"></i>
-              </button>
+                  <i className="fas fa-chevron-right mobile-settings-action-chevron"></i>
+                </button>
+              )}
 
-              <button className="mobile-settings-action-item" onClick={handleChangePin}>
-                <div className="mobile-settings-action-left">
-                  <i className="fas fa-pen mobile-settings-action-icon"></i>
-                  <div className="mobile-settings-action-text">
-                    <div className="mobile-settings-action-title">Change PIN</div>
-                    <div className="mobile-settings-action-subtitle">Update current PIN</div>
-                  </div>
-                </div>
-                <i className="fas fa-chevron-right mobile-settings-action-chevron"></i>
-              </button>
+              {hasPin === true && (
+                <>
+                  <button className="mobile-settings-action-item" onClick={handleChangePin}>
+                    <div className="mobile-settings-action-left">
+                      <i className="fas fa-pen mobile-settings-action-icon"></i>
+                      <div className="mobile-settings-action-text">
+                        <div className="mobile-settings-action-title">Change PIN</div>
+                        <div className="mobile-settings-action-subtitle">Update current PIN</div>
+                      </div>
+                    </div>
+                    <i className="fas fa-chevron-right mobile-settings-action-chevron"></i>
+                  </button>
 
-              <button className="mobile-settings-action-item mobile-settings-action-item-last" onClick={handleResetPin}>
-                <div className="mobile-settings-action-left">
-                  <i className="fas fa-rotate-left mobile-settings-action-icon"></i>
-                  <div className="mobile-settings-action-text">
-                    <div className="mobile-settings-action-title">Reset PIN</div>
-                    <div className="mobile-settings-action-subtitle">Recover forgotten PIN</div>
-                  </div>
-                </div>
-                <i className="fas fa-chevron-right mobile-settings-action-chevron"></i>
-              </button>
+                  <button className="mobile-settings-action-item mobile-settings-action-item-last" onClick={handleResetPin}>
+                    <div className="mobile-settings-action-left">
+                      <i className="fas fa-rotate-left mobile-settings-action-icon"></i>
+                      <div className="mobile-settings-action-text">
+                        <div className="mobile-settings-action-title">Reset PIN</div>
+                        <div className="mobile-settings-action-subtitle">Recover forgotten PIN</div>
+                      </div>
+                    </div>
+                    <i className="fas fa-chevron-right mobile-settings-action-chevron"></i>
+                  </button>
+                </>
+              )}
             </div>
           </div>
 
@@ -371,10 +447,13 @@ const MobileSettingsPage: React.FC = () => {
             </div>
 
             {pinFormError && <div className="mobile-settings-pin-error">{pinFormError}</div>}
+            {pinFormSuccess && <div className="mobile-settings-pin-success">{pinFormSuccess}</div>}
 
             <div className="mobile-settings-pin-actions">
-              <button onClick={handleClosePinModal} className="mobile-settings-pin-cancel">Cancel</button>
-              <button onClick={handleSubmitPinModal} className="mobile-settings-pin-submit">Continue</button>
+              <button onClick={handleClosePinModal} className="mobile-settings-pin-cancel" disabled={pinLoading}>Cancel</button>
+              <button onClick={handleSubmitPinModal} className="mobile-settings-pin-submit" disabled={pinLoading}>
+                {pinLoading ? 'Please wait...' : 'Continue'}
+              </button>
             </div>
           </div>
         </div>
