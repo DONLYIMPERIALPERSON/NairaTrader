@@ -119,6 +119,27 @@ def list_challenge_accounts(
     return {"accounts": [_to_row(row, mt5_by_id, user_by_id) for row in rows]}
 
 
+@router.get("/active")
+def list_active_challenge_accounts(
+    _: User = Depends(get_current_admin_allowlisted),
+    db: Session = Depends(get_db),
+) -> dict[str, list[dict[str, str | int | None]]]:
+    rows = db.scalars(
+        select(ChallengeAccount)
+        .where(ChallengeAccount.objective_status == "active")
+        .where(ChallengeAccount.current_stage != "Funded")
+        .order_by(ChallengeAccount.id.desc())
+    ).all()
+    active_ids = [row.active_mt5_account_id for row in rows if row.active_mt5_account_id is not None]
+    user_ids = sorted({row.user_id for row in rows})
+    mt5_rows = db.scalars(select(MT5Account).where(MT5Account.id.in_(active_ids))).all() if active_ids else []
+    user_rows = db.scalars(select(User).where(User.id.in_(user_ids))).all() if user_ids else []
+    mt5_by_id = {row.id: row for row in mt5_rows}
+    user_by_id = {row.id: row for row in user_rows}
+
+    return {"accounts": [_to_row(row, mt5_by_id, user_by_id) for row in rows]}
+
+
 @router.get("/breaches")
 def list_breached_accounts(
     _: User = Depends(get_current_admin_allowlisted),
@@ -359,7 +380,10 @@ def list_funded_accounts(
 ) -> dict[str, list[dict[str, str | int | None]]]:
     rows = db.scalars(
         select(ChallengeAccount)
-        .where(ChallengeAccount.current_stage == "Funded")
+        .where(
+            ChallengeAccount.current_stage == "Funded",
+            ChallengeAccount.objective_status != "breached"
+        )
         .order_by(ChallengeAccount.id.desc())
     ).all()
     active_ids = [row.active_mt5_account_id for row in rows if row.active_mt5_account_id is not None]
@@ -370,6 +394,38 @@ def list_funded_accounts(
     user_by_id = {row.id: row for row in user_rows}
 
     return {"accounts": [_to_row(row, mt5_by_id, user_by_id) for row in rows]}
+
+
+@router.get("/funded/profitable")
+def list_profitable_funded_accounts(
+    _: User = Depends(get_current_admin_allowlisted),
+    db: Session = Depends(get_db),
+) -> dict[str, list[dict[str, str | int | None]]]:
+    rows = db.scalars(
+        select(ChallengeAccount)
+        .where(
+            ChallengeAccount.current_stage == "Funded",
+            ChallengeAccount.objective_status != "breached"
+        )
+        .order_by(ChallengeAccount.funded_profit_capped.desc())
+        .limit(10)
+    ).all()
+    active_ids = [row.active_mt5_account_id for row in rows if row.active_mt5_account_id is not None]
+    user_ids = sorted({row.user_id for row in rows})
+    mt5_rows = db.scalars(select(MT5Account).where(MT5Account.id.in_(active_ids))).all() if active_ids else []
+    user_rows = db.scalars(select(User).where(User.id.in_(user_ids))).all() if user_ids else []
+    mt5_by_id = {row.id: row for row in mt5_rows}
+    user_by_id = {row.id: row for row in user_rows}
+
+    result = []
+    for i, row in enumerate(rows, 1):
+        base_row = _to_row(row, mt5_by_id, user_by_id)
+        base_row["rank"] = i
+        base_row["profit"] = f"+₦{row.funded_profit_capped:,.2f}" if row.funded_profit_capped and row.funded_profit_capped > 0 else "₦0"
+        base_row["win_rate"] = f"{compute_win_rate(row):.1f}%"
+        result.append(base_row)
+
+    return {"accounts": result}
 
 
 @router.delete("/{challenge_id}")

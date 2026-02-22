@@ -1,152 +1,378 @@
-import type { AdminUser } from './UsersPage'
+import { useState, useEffect } from 'react'
+import {
+  fetchAffiliateOverview,
+  fetchAffiliateCommissions,
+  fetchAffiliatePayouts,
+  fetchAffiliateMilestones,
+  approveAffiliatePayout,
+  rejectAffiliatePayout,
+  approveAffiliateMilestone,
+  rejectAffiliateMilestone,
+  type AffiliateOverviewStats,
+  type AffiliateCommission,
+  type AffiliatePayout,
+  type AffiliateMilestone,
+} from '../lib/adminAuth'
 import './ReferralsPage.css'
 
-const referralKpis = [
-  { label: 'Total Affiliates', value: '4,218' },
-  { label: 'Active Affiliates (30d)', value: '1,096' },
-  { label: 'Total Referred Users', value: '18,442' },
-  { label: 'Converted Traders', value: '6,804' },
-  { label: 'Conversion Rate', value: '36.9%' },
-  { label: 'Total Commission Paid', value: '₦84,220,000' },
-  { label: 'Pending Commission', value: '₦5,740,000' },
-  { label: 'Fraud / Self-referral Flags', value: '27' },
-]
+interface ReferralsPageProps {}
 
-const topAffiliates: Array<{
-  id: string
-  name: string
-  email: string
-  code: string
-  referred: number
-  converted: number
-  conversion: string
-  commissionEarned: string
-  pendingPayout: string
-  lastActivity: string
-  risk: string
-  user: AdminUser
-}> = [
-  {
-    id: 'AFF-1022',
-    name: 'Favour M.',
-    email: 'favour@mail.com',
-    code: 'FAVOUR22',
-    referred: 123,
-    converted: 48,
-    conversion: '39.0%',
-    commissionEarned: '₦2,820,000',
-    pendingPayout: '₦240,000',
-    lastActivity: '2h ago',
-    risk: 'Low',
-    user: { name: 'Favour M.', email: 'favour@mail.com', accounts: '2 / 1', revenue: '₦1,280,000', orders: '6', payouts: '₦280,000' },
-  },
-  {
-    id: 'AFF-1184',
-    name: 'Chinedu A.',
-    email: 'chinedu@mail.com',
-    code: 'CHI-TRADES',
-    referred: 96,
-    converted: 32,
-    conversion: '33.3%',
-    commissionEarned: '₦1,940,000',
-    pendingPayout: '₦180,000',
-    lastActivity: '5h ago',
-    risk: 'Medium',
-    user: { name: 'Chinedu A.', email: 'chinedu@mail.com', accounts: '3 / 1', revenue: '₦2,940,000', orders: '11', payouts: '₦620,000' },
-  },
-  {
-    id: 'AFF-1230',
-    name: 'Grace O.',
-    email: 'grace@mail.com',
-    code: 'GRACEFX',
-    referred: 84,
-    converted: 27,
-    conversion: '32.1%',
-    commissionEarned: '₦1,420,000',
-    pendingPayout: '₦120,000',
-    lastActivity: '1d ago',
-    risk: 'Low',
-    user: { name: 'Grace O.', email: 'grace@mail.com', accounts: '1 / 0', revenue: '₦490,000', orders: '2', payouts: '₦0' },
-  },
-]
+const ReferralsPage = ({}: ReferralsPageProps) => {
+  const [activeTab, setActiveTab] = useState<'overview' | 'commissions' | 'payouts' | 'milestones'>('overview')
+  const [overview, setOverview] = useState<AffiliateOverviewStats | null>(null)
+  const [commissions, setCommissions] = useState<AffiliateCommission[]>([])
+  const [payouts, setPayouts] = useState<AffiliatePayout[]>([])
+  const [milestones, setMilestones] = useState<AffiliateMilestone[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-interface ReferralsPageProps {
-  onOpenProfile: (user: AdminUser) => void
-}
+  useEffect(() => {
+    loadOverview()
+  }, [])
 
-const ReferralsPage = ({ onOpenProfile }: ReferralsPageProps) => {
+  const loadOverview = async () => {
+    try {
+      setLoading(true)
+      setError(null)
+      const data = await fetchAffiliateOverview()
+      setOverview(data)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load affiliate data')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const loadCommissions = async () => {
+    try {
+      const data = await fetchAffiliateCommissions()
+      setCommissions(data.commissions)
+    } catch (err) {
+      console.error('Failed to load commissions:', err)
+    }
+  }
+
+  const loadPayouts = async () => {
+    try {
+      const data = await fetchAffiliatePayouts()
+      setPayouts(data.payouts)
+    } catch (err) {
+      console.error('Failed to load payouts:', err)
+    }
+  }
+
+  const loadMilestones = async () => {
+    try {
+      const data = await fetchAffiliateMilestones()
+      setMilestones(data.milestones)
+    } catch (err) {
+      console.error('Failed to load milestones:', err)
+    }
+  }
+
+  const handleTabChange = (tab: typeof activeTab) => {
+    setActiveTab(tab)
+    if (tab === 'commissions' && commissions.length === 0) {
+      loadCommissions()
+    } else if (tab === 'payouts' && payouts.length === 0) {
+      loadPayouts()
+    } else if (tab === 'milestones' && milestones.length === 0) {
+      loadMilestones()
+    }
+  }
+
+  const handleApprovePayout = async (payoutId: number) => {
+    try {
+      await approveAffiliatePayout(payoutId)
+      // Reload payouts
+      loadPayouts()
+      loadOverview()
+    } catch (err) {
+      alert('Failed to approve payout')
+    }
+  }
+
+  const handleRejectPayout = async (payoutId: number) => {
+    const reason = prompt('Reason for rejection (optional):')
+    try {
+      await rejectAffiliatePayout(payoutId, reason || undefined)
+      // Reload payouts
+      loadPayouts()
+      loadOverview()
+    } catch (err) {
+      alert('Failed to reject payout')
+    }
+  }
+
+  const handleApproveMilestone = async (milestoneId: number) => {
+    try {
+      await approveAffiliateMilestone(milestoneId)
+      // Reload milestones
+      loadMilestones()
+      loadOverview()
+    } catch (err) {
+      alert('Failed to approve milestone')
+    }
+  }
+
+  const handleRejectMilestone = async (milestoneId: number) => {
+    const reason = prompt('Reason for rejection (optional):')
+    try {
+      await rejectAffiliateMilestone(milestoneId, reason || undefined)
+      // Reload milestones
+      loadMilestones()
+      loadOverview()
+    } catch (err) {
+      alert('Failed to reject milestone')
+    }
+  }
+
+  if (loading) {
+    return (
+      <section className="admin-page-stack referrals-page">
+        <div className="admin-dashboard-card">
+          <h2>Referrals / Affiliates</h2>
+          <p>Loading affiliate data...</p>
+        </div>
+      </section>
+    )
+  }
+
+  if (error) {
+    return (
+      <section className="admin-page-stack referrals-page">
+        <div className="admin-dashboard-card">
+          <h2>Referrals / Affiliates</h2>
+          <p className="error">Error: {error}</p>
+          <button onClick={loadOverview}>Retry</button>
+        </div>
+      </section>
+    )
+  }
+
   return (
     <section className="admin-page-stack referrals-page">
       <div className="admin-dashboard-card">
         <h2>Referrals / Affiliates</h2>
-        <p>Commission performance, conversion quality, payout liabilities, and referral abuse monitoring.</p>
+        <p>Commission performance, payout management, and milestone tracking.</p>
       </div>
 
-      <div className="admin-kpi-grid referrals-kpi-grid">
-        {referralKpis.map((kpi) => (
-          <article key={kpi.label} className="admin-kpi-card">
-            <h3>{kpi.label}</h3>
-            <strong>{kpi.value}</strong>
-          </article>
-        ))}
-      </div>
-
+      {/* Tab Navigation */}
       <div className="admin-dashboard-card">
-        <h3>Top Affiliates (Performance + Risk)</h3>
-        <div className="admin-table-card referrals-table-card">
-          <table className="admin-table">
-            <thead>
-              <tr>
-                <th>Affiliate</th>
-                <th>Code</th>
-                <th>Referred</th>
-                <th>Converted</th>
-                <th>CVR</th>
-                <th>Commission Earned</th>
-                <th>Pending Payout</th>
-                <th>Last Activity</th>
-                <th>Risk</th>
-                <th>Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {topAffiliates.map((affiliate) => (
-                <tr key={affiliate.id}>
-                  <td>
-                    <div className="ref-aff-name">{affiliate.name}</div>
-                    <div className="ref-aff-email">{affiliate.email}</div>
-                  </td>
-                  <td>{affiliate.code}</td>
-                  <td>{affiliate.referred}</td>
-                  <td>{affiliate.converted}</td>
-                  <td>{affiliate.conversion}</td>
-                  <td>{affiliate.commissionEarned}</td>
-                  <td>{affiliate.pendingPayout}</td>
-                  <td>{affiliate.lastActivity}</td>
-                  <td>
-                    <span className={`ref-risk-chip ${affiliate.risk.toLowerCase()}`}>{affiliate.risk}</span>
-                  </td>
-                  <td>
-                    <button type="button" className="ref-view-btn" onClick={() => onOpenProfile(affiliate.user)}>
-                      View Profile
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="tab-navigation">
+          <button
+            className={activeTab === 'overview' ? 'active' : ''}
+            onClick={() => handleTabChange('overview')}
+          >
+            Overview
+          </button>
+          <button
+            className={activeTab === 'commissions' ? 'active' : ''}
+            onClick={() => handleTabChange('commissions')}
+          >
+            Commissions
+          </button>
+          <button
+            className={activeTab === 'payouts' ? 'active' : ''}
+            onClick={() => handleTabChange('payouts')}
+          >
+            Payouts
+          </button>
+          <button
+            className={activeTab === 'milestones' ? 'active' : ''}
+            onClick={() => handleTabChange('milestones')}
+          >
+            Milestones
+          </button>
         </div>
       </div>
 
-      <div className="admin-dashboard-card">
-        <h3>Admin Checks Needed</h3>
-        <ul className="admin-list">
-          <li>Watch for self-referrals (same device / IP / payment instrument matches).</li>
-          <li>Review unusually high conversion spikes in short windows.</li>
-          <li>Confirm payout eligibility vs refund/chargeback exposure before approval.</li>
-          <li>Track inactive affiliates with high pending commissions.</li>
-        </ul>
-      </div>
+      {activeTab === 'overview' && overview && (
+        <>
+          <div className="admin-kpi-grid referrals-kpi-grid">
+            <article className="admin-kpi-card">
+              <h3>Total Affiliates</h3>
+              <strong>{overview.total_affiliates.toLocaleString()}</strong>
+            </article>
+            <article className="admin-kpi-card">
+              <h3>Total Commissions</h3>
+              <strong>₦{overview.total_commissions.toLocaleString()}</strong>
+            </article>
+            <article className="admin-kpi-card">
+              <h3>Total Paid Out</h3>
+              <strong>₦{overview.total_paid_out.toLocaleString()}</strong>
+            </article>
+            <article className="admin-kpi-card">
+              <h3>Pending Payouts</h3>
+              <strong>{overview.pending_payouts_count} (₦{overview.pending_payouts_sum.toLocaleString()})</strong>
+            </article>
+            <article className="admin-kpi-card">
+              <h3>Pending Milestones</h3>
+              <strong>{overview.pending_milestones}</strong>
+            </article>
+            <article className="admin-kpi-card">
+              <h3>Unique Purchasers</h3>
+              <strong>{overview.unique_purchasers.toLocaleString()}</strong>
+            </article>
+          </div>
+
+          <div className="admin-dashboard-card">
+            <h3>Admin Actions Required</h3>
+            <ul className="admin-list">
+              <li><strong>Pending Payouts:</strong> {overview.pending_payouts_count} payouts awaiting approval</li>
+              <li><strong>Pending Milestones:</strong> {overview.pending_milestones} milestone rewards to process</li>
+              <li>Review payout requests for bank details and eligibility</li>
+              <li>Monitor commission trends and affiliate performance</li>
+            </ul>
+          </div>
+        </>
+      )}
+
+      {activeTab === 'commissions' && (
+        <div className="admin-dashboard-card">
+          <h3>Recent Commissions</h3>
+          <div className="admin-table-card">
+            <table className="admin-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Affiliate</th>
+                  <th>Order ID</th>
+                  <th>Customer</th>
+                  <th>Amount</th>
+                  <th>Status</th>
+                  <th>Product</th>
+                </tr>
+              </thead>
+              <tbody>
+                {commissions.map((commission) => (
+                  <tr key={commission.id}>
+                    <td>{commission.date}</td>
+                    <td>{commission.affiliate}</td>
+                    <td>{commission.order_id}</td>
+                    <td>{commission.customer}</td>
+                    <td>₦{commission.amount.toLocaleString()}</td>
+                    <td>
+                      <span className={`status-chip ${commission.status.toLowerCase()}`}>
+                        {commission.status}
+                      </span>
+                    </td>
+                    <td>{commission.product_summary || 'N/A'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'payouts' && (
+        <div className="admin-dashboard-card">
+          <h3>Payout Requests</h3>
+          <div className="admin-table-card">
+            <table className="admin-table">
+              <thead>
+                <tr>
+                  <th>Affiliate</th>
+                  <th>Amount</th>
+                  <th>Status</th>
+                  <th>Bank Details</th>
+                  <th>Requested</th>
+                  <th>Approved</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {payouts.map((payout) => (
+                  <tr key={payout.id}>
+                    <td>{payout.affiliate}</td>
+                    <td>₦{payout.amount.toLocaleString()}</td>
+                    <td>
+                      <span className={`status-chip ${payout.status.toLowerCase()}`}>
+                        {payout.status}
+                      </span>
+                    </td>
+                    <td>{payout.bank_details}</td>
+                    <td>{payout.requested_at}</td>
+                    <td>{payout.approved_at || 'N/A'}</td>
+                    <td>
+                      {payout.status === 'pending' && (
+                        <div className="action-buttons">
+                          <button
+                            className="approve-btn"
+                            onClick={() => handleApprovePayout(payout.id)}
+                          >
+                            Approve
+                          </button>
+                          <button
+                            className="reject-btn"
+                            onClick={() => handleRejectPayout(payout.id)}
+                          >
+                            Reject
+                          </button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'milestones' && (
+        <div className="admin-dashboard-card">
+          <h3>Milestone Requests</h3>
+          <div className="admin-table-card">
+            <table className="admin-table">
+              <thead>
+                <tr>
+                  <th>Affiliate</th>
+                  <th>Level</th>
+                  <th>Status</th>
+                  <th>Requested</th>
+                  <th>Processed</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {milestones.map((milestone) => (
+                  <tr key={milestone.id}>
+                    <td>{milestone.affiliate}</td>
+                    <td>{milestone.level}</td>
+                    <td>
+                      <span className={`status-chip ${milestone.status.toLowerCase()}`}>
+                        {milestone.status}
+                      </span>
+                    </td>
+                    <td>{milestone.requested_at}</td>
+                    <td>{milestone.processed_at || 'N/A'}</td>
+                    <td>
+                      {milestone.status === 'pending' && (
+                        <div className="action-buttons">
+                          <button
+                            className="approve-btn"
+                            onClick={() => handleApproveMilestone(milestone.id)}
+                          >
+                            Approve
+                          </button>
+                          <button
+                            className="reject-btn"
+                            onClick={() => handleRejectMilestone(milestone.id)}
+                          >
+                            Reject
+                          </button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </section>
   )
 }

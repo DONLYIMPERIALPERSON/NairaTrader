@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { AdminUser } from './UsersPage'
-import { fetchFundedChallengeAccounts, type ChallengeAccountListItem } from '../lib/adminAuth'
+import { fetchFundedChallengeAccounts, fetchProfitableFundedAccounts, type ChallengeAccountListItem } from '../lib/adminAuth'
 
 interface FundedAccountsPageProps {
   onOpenProfile: (user: AdminUser) => void
@@ -10,6 +10,7 @@ const FundedAccountsPage = ({ onOpenProfile }: FundedAccountsPageProps) => {
   const [leaderboardPage, setLeaderboardPage] = useState(1)
   const [fundedListPage, setFundedListPage] = useState(1)
   const [fundedAccounts, setFundedAccounts] = useState<ChallengeAccountListItem[]>([])
+  const [topTraders, setTopTraders] = useState<ChallengeAccountListItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const leaderboardPageSize = 3
@@ -20,8 +21,12 @@ const FundedAccountsPage = ({ onOpenProfile }: FundedAccountsPageProps) => {
       setLoading(true)
       setError('')
       try {
-        const response = await fetchFundedChallengeAccounts()
-        setFundedAccounts(response.accounts)
+        const [fundedResponse, profitableResponse] = await Promise.all([
+          fetchFundedChallengeAccounts(),
+          fetchProfitableFundedAccounts()
+        ])
+        setFundedAccounts(fundedResponse.accounts)
+        setTopTraders(profitableResponse.accounts)
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load funded accounts')
       } finally {
@@ -31,19 +36,6 @@ const FundedAccountsPage = ({ onOpenProfile }: FundedAccountsPageProps) => {
 
     void load()
   }, [])
-
-  const topTraders = [
-    { rank: 1, trader: 'Chinedu A.', accountSize: '₦1.5m', profit: '+₦2,480,000', winRate: '74%' },
-    { rank: 2, trader: 'Fatima S.', accountSize: '₦800k', profit: '+₦2,120,000', winRate: '71%' },
-    { rank: 3, trader: 'Tunde O.', accountSize: '₦1.5m', profit: '+₦1,920,000', winRate: '69%' },
-    { rank: 4, trader: 'Grace O.', accountSize: '₦600k', profit: '+₦1,540,000', winRate: '67%' },
-    { rank: 5, trader: 'Favour M.', accountSize: '₦400k', profit: '+₦1,120,000', winRate: '66%' },
-    { rank: 6, trader: 'Rasheed T.', accountSize: '₦800k', profit: '+₦990,000', winRate: '64%' },
-    { rank: 7, trader: 'Amina Y.', accountSize: '₦600k', profit: '+₦860,000', winRate: '63%' },
-    { rank: 8, trader: 'Samuel P.', accountSize: '₦400k', profit: '+₦790,000', winRate: '61%' },
-    { rank: 9, trader: 'Kelvin D.', accountSize: '₦800k', profit: '+₦710,000', winRate: '60%' },
-    { rank: 10, trader: 'Ngozi R.', accountSize: '₦600k', profit: '+₦680,000', winRate: '59%' },
-  ]
 
   const openProfileFromName = (name: string, revenue: string) => {
     onOpenProfile({
@@ -96,15 +88,15 @@ const FundedAccountsPage = ({ onOpenProfile }: FundedAccountsPageProps) => {
             </tr>
           </thead>
           <tbody>
-            {paginatedLeaderboard.map((row) => (
-              <tr key={row.rank}>
-                <td>#{row.rank}</td>
-                <td>{row.trader}</td>
-                <td>{row.accountSize}</td>
-                <td>{row.profit}</td>
-                <td>{row.winRate}</td>
+            {paginatedLeaderboard.map((row, index) => (
+              <tr key={row.challenge_id}>
+                <td>#{(leaderboardPage - 1) * leaderboardPageSize + index + 1}</td>
+                <td>{row.trader_name ?? `User ${row.user_id}`}</td>
+                <td>{row.account_size}</td>
+                <td>{row.profit ?? '₦0'}</td>
+                <td>{row.win_rate ?? '0%'}</td>
                 <td>
-                  <button type="button" onClick={() => openProfileFromName(row.trader, row.profit)}>
+                  <button type="button" onClick={() => openProfileFromName(row.trader_name ?? `User ${row.user_id}`, row.profit ?? '₦0')}>
                     View Profile
                   </button>
                 </td>

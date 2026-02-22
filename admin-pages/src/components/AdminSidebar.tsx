@@ -7,139 +7,180 @@ interface AdminSidebarProps {
   onNavigate: (page: AdminPage) => void
   onLogout: () => void
   isLoggingOut: boolean
+  allowedPages?: string[]
+  userRole?: string
 }
 
-const AdminSidebar = ({ activePage, onNavigate, onLogout, isLoggingOut }: AdminSidebarProps) => {
+const AdminSidebar = ({ activePage, onNavigate, onLogout, isLoggingOut, allowedPages, userRole }: AdminSidebarProps) => {
+  // Super admins have access to all pages
+  const hasAccess = (pageId: string) => {
+    if (userRole === 'super_admin') return true
+    if (!allowedPages || allowedPages.length === 0) return true // No restrictions
+    return allowedPages.includes(pageId)
+  }
+
   return (
     <aside className="admin-sidebar">
       <nav className="admin-sidebar-nav">
-        <button
-          className={`admin-sidebar-item ${activePage === 'analysis' ? 'active' : ''}`}
-          type="button"
-          onClick={() => onNavigate('analysis')}
-        >
-          Analysis
-        </button>
-        <button
-          className={`admin-sidebar-item ${activePage === 'workBoard' ? 'active' : ''}`}
-          type="button"
-          onClick={() => onNavigate('workBoard')}
-        >
-          Work Board
-        </button>
+        {hasAccess('analysis') && (
+          <button
+            className={`admin-sidebar-item ${activePage === 'analysis' ? 'active' : ''}`}
+            type="button"
+            onClick={() => onNavigate('analysis')}
+          >
+            Analysis
+          </button>
+        )}
+        {hasAccess('workBoard') && (
+          <button
+            className={`admin-sidebar-item ${activePage === 'workBoard' ? 'active' : ''}`}
+            type="button"
+            onClick={() => onNavigate('workBoard')}
+          >
+            Work Board
+          </button>
+        )}
 
         <div className="admin-sidebar-group">
           <p className="admin-sidebar-group-title">Users</p>
-          <button
-            className={`admin-sidebar-subitem ${activePage === 'users' ? 'active' : ''}`}
-            type="button"
-            onClick={() => onNavigate('users')}
-          >
-            All Users
-          </button>
-          <button
-            className={`admin-sidebar-subitem ${activePage === 'kycReview' ? 'active' : ''}`}
-            type="button"
-            onClick={() => onNavigate('kycReview')}
-          >
-            KYC Review
-          </button>
-          <button
-            className={`admin-sidebar-subitem ${activePage === 'referrals' ? 'active' : ''}`}
-            type="button"
-            onClick={() => onNavigate('referrals')}
-          >
-            Affiliates
-          </button>
+          {hasAccess('users') && (
+            <button
+              className={`admin-sidebar-subitem ${activePage === 'users' ? 'active' : ''}`}
+              type="button"
+              onClick={() => onNavigate('users')}
+            >
+              All Users
+            </button>
+          )}
+          {hasAccess('kycReview') && (
+            <button
+              className={`admin-sidebar-subitem ${activePage === 'kycReview' ? 'active' : ''}`}
+              type="button"
+              onClick={() => onNavigate('kycReview')}
+            >
+              KYC Review
+            </button>
+          )}
+          {hasAccess('referrals') && (
+            <button
+              className={`admin-sidebar-subitem ${activePage === 'referrals' ? 'active' : ''}`}
+              type="button"
+              onClick={() => onNavigate('referrals')}
+            >
+              Affiliates
+            </button>
+          )}
         </div>
 
         <div className="admin-sidebar-group">
           <p className="admin-sidebar-group-title">Finance</p>
-          <button
-            className={`admin-sidebar-subitem ${activePage === 'payouts' ? 'active' : ''}`}
-            type="button"
-            onClick={() => onNavigate('payouts')}
-          >
-            Payout Requests
-          </button>
-          <button
-            className={`admin-sidebar-subitem ${activePage === 'orders' ? 'active' : ''}`}
-            type="button"
-            onClick={() => onNavigate('orders')}
-          >
-            Orders
-          </button>
-          <button
-            className={`admin-sidebar-subitem ${activePage === 'financeAnalysis' ? 'active' : ''}`}
-            type="button"
-            onClick={() => onNavigate('financeAnalysis')}
-          >
-            Financial Analysis & Settings
-          </button>
+          {hasAccess('payouts') && (
+            <button
+              className={`admin-sidebar-subitem ${activePage === 'payouts' ? 'active' : ''}`}
+              type="button"
+              onClick={() => onNavigate('payouts')}
+            >
+              Payout Requests
+            </button>
+          )}
+          {hasAccess('orders') && (
+            <button
+              className={`admin-sidebar-subitem ${activePage === 'orders' ? 'active' : ''}`}
+              type="button"
+              onClick={() => onNavigate('orders')}
+            >
+              Orders
+            </button>
+          )}
+          {hasAccess('financeAnalysis') && (
+            <button
+              className={`admin-sidebar-subitem ${activePage === 'financeAnalysis' ? 'active' : ''}`}
+              type="button"
+              onClick={() => onNavigate('financeAnalysis')}
+            >
+              Financial Analysis & Settings
+            </button>
+          )}
         </div>
 
         <div className="admin-sidebar-group">
           <p className="admin-sidebar-group-title">Accounts</p>
-          <button
-            className={`admin-sidebar-subitem ${activePage === 'accounts' ? 'active' : ''}`}
-            type="button"
-            onClick={() => onNavigate('accounts')}
-          >
-            Challenges
-          </button>
-          <button
-            className={`admin-sidebar-subitem ${activePage === 'fundedAccounts' ? 'active' : ''}`}
-            type="button"
-            onClick={() => onNavigate('fundedAccounts')}
-          >
-            Funded Accounts
-          </button>
-          <button
-            className={`admin-sidebar-subitem ${activePage === 'breaches' ? 'active' : ''}`}
-            type="button"
-            onClick={() => onNavigate('breaches')}
-          >
-            Breaches
-          </button>
-          <button
-            className={`admin-sidebar-subitem ${activePage === 'mt5' ? 'active' : ''}`}
-            type="button"
-            onClick={() => onNavigate('mt5')}
-          >
-            MT5
-          </button>
+          {hasAccess('accounts') && (
+            <button
+              className={`admin-sidebar-subitem ${activePage === 'accounts' ? 'active' : ''}`}
+              type="button"
+              onClick={() => onNavigate('accounts')}
+            >
+              Challenges
+            </button>
+          )}
+          {hasAccess('fundedAccounts') && (
+            <button
+              className={`admin-sidebar-subitem ${activePage === 'fundedAccounts' ? 'active' : ''}`}
+              type="button"
+              onClick={() => onNavigate('fundedAccounts')}
+            >
+              Funded Accounts
+            </button>
+          )}
+          {hasAccess('breaches') && (
+            <button
+              className={`admin-sidebar-subitem ${activePage === 'breaches' ? 'active' : ''}`}
+              type="button"
+              onClick={() => onNavigate('breaches')}
+            >
+              Breaches
+            </button>
+          )}
+          {hasAccess('mt5') && (
+            <button
+              className={`admin-sidebar-subitem ${activePage === 'mt5' ? 'active' : ''}`}
+              type="button"
+              onClick={() => onNavigate('mt5')}
+            >
+              MT5
+            </button>
+          )}
         </div>
 
         <div className="admin-sidebar-group">
           <p className="admin-sidebar-group-title">Prop Firm Ops</p>
-          <button
-            className={`admin-sidebar-subitem ${activePage === 'coupons' ? 'active' : ''}`}
-            type="button"
-            onClick={() => onNavigate('coupons')}
-          >
-            Coupons
-          </button>
-          <button
-            className={`admin-sidebar-subitem ${activePage === 'supportTickets' ? 'active' : ''}`}
-            type="button"
-            onClick={() => onNavigate('supportTickets')}
-          >
-            Support Tickets
-          </button>
-          <button
-            className={`admin-sidebar-subitem ${activePage === 'sendAnnouncement' ? 'active' : ''}`}
-            type="button"
-            onClick={() => onNavigate('sendAnnouncement')}
-          >
-            Send Announcement
-          </button>
-          <button
-            className={`admin-sidebar-subitem ${activePage === 'settings' ? 'active' : ''}`}
-            type="button"
-            onClick={() => onNavigate('settings')}
-          >
-            Settings
-          </button>
+          {hasAccess('coupons') && (
+            <button
+              className={`admin-sidebar-subitem ${activePage === 'coupons' ? 'active' : ''}`}
+              type="button"
+              onClick={() => onNavigate('coupons')}
+            >
+              Coupons
+            </button>
+          )}
+          {hasAccess('supportTickets') && (
+            <button
+              className={`admin-sidebar-subitem ${activePage === 'supportTickets' ? 'active' : ''}`}
+              type="button"
+              onClick={() => onNavigate('supportTickets')}
+            >
+              Support Tickets
+            </button>
+          )}
+          {hasAccess('sendAnnouncement') && (
+            <button
+              className={`admin-sidebar-subitem ${activePage === 'sendAnnouncement' ? 'active' : ''}`}
+              type="button"
+              onClick={() => onNavigate('sendAnnouncement')}
+            >
+              Send Announcement
+            </button>
+          )}
+          {hasAccess('settings') && (
+            <button
+              className={`admin-sidebar-subitem ${activePage === 'settings' ? 'active' : ''}`}
+              type="button"
+              onClick={() => onNavigate('settings')}
+            >
+              Settings
+            </button>
+          )}
         </div>
 
         <div className="admin-sidebar-group">

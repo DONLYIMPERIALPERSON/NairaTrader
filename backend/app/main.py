@@ -23,6 +23,9 @@ from app.api.profile_routes import router as profile_router
 from app.api.certificate_routes import router as certificate_router
 from app.api.support_routes import router as support_router
 from app.api.admin_support_routes import router as admin_support_router
+from app.api.admin_announcement_routes import router as admin_announcement_router
+from app.api.admin_finance_routes import router as admin_finance_router
+from app.api.admin_workboard_routes import router as admin_workboard_router
 from app.core.config import settings
 
 # Configure logging
@@ -68,6 +71,9 @@ app.include_router(pin_router, tags=["PIN"])
 app.include_router(certificate_router, tags=["Certificates"])
 app.include_router(support_router, tags=["Support"])
 app.include_router(admin_support_router, tags=["Admin Support"])
+app.include_router(admin_announcement_router, tags=["Admin Announcements"])
+app.include_router(admin_finance_router, tags=["Admin Finance"])
+app.include_router(admin_workboard_router, tags=["Admin Workboard"])
 
 
 @app.get("/health", tags=["Health"])

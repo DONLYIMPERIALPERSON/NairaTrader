@@ -1,3 +1,4 @@
+import json
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import APIKeyHeader
 from sqlalchemy import select
@@ -16,7 +17,14 @@ router = APIRouter(prefix="/admin/auth", tags=["Admin Auth"])
 bootstrap_key_header = APIKeyHeader(name="X-Admin-Bootstrap-Secret", auto_error=False)
 
 
-def _serialize_allowlist(entry: AdminAllowlist) -> dict[str, str | int | bool | None]:
+def _serialize_allowlist(entry: AdminAllowlist) -> dict[str, str | int | bool | list[str] | None]:
+    allowed_pages = None
+    if entry.allowed_pages:
+        try:
+            allowed_pages = json.loads(entry.allowed_pages)
+        except (json.JSONDecodeError, TypeError):
+            allowed_pages = []
+
     return {
         "id": entry.id,
         "email": entry.email,
@@ -26,6 +34,7 @@ def _serialize_allowlist(entry: AdminAllowlist) -> dict[str, str | int | bool | 
         "status": entry.status,
         "require_mfa": entry.require_mfa,
         "mfa_enrolled": entry.mfa_enrolled,
+        "allowed_pages": allowed_pages,
         "created_by_user_id": entry.created_by_user_id,
     }
 
@@ -64,8 +73,11 @@ def _assert_bootstrap_secret(secret: str | None) -> None:
 
 
 @router.post("/login")
-def admin_login(current_admin: User = Depends(get_current_admin_allowlisted)) -> dict[str, str | int | None]:
-    return serialize_user(current_admin)
+def admin_login(
+    current_admin: User = Depends(get_current_admin_allowlisted),
+    db: Session = Depends(get_db),
+) -> dict[str, str | int | list[str] | None]:
+    return serialize_user(current_admin, db)
 
 
 @router.post("/logout")
@@ -78,8 +90,11 @@ def admin_logout(current_admin: User = Depends(get_current_admin_allowlisted)) -
 
 
 @router.get("/me")
-def admin_me(current_admin: User = Depends(get_current_admin_allowlisted)) -> dict[str, str | int | None]:
-    return serialize_user(current_admin)
+def admin_me(
+    current_admin: User = Depends(get_current_admin_allowlisted),
+    db: Session = Depends(get_db),
+) -> dict[str, str | int | list[str] | None]:
+    return serialize_user(current_admin, db)
 
 
 @router.get("/allowlist")
@@ -103,12 +118,17 @@ def add_allowlist_entry(
     if existing:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Admin email already allowlisted")
 
+    allowed_pages_json = None
+    if payload.allowed_pages:
+        allowed_pages_json = json.dumps(payload.allowed_pages)
+
     row = AdminAllowlist(
         email=email,
         full_name=payload.full_name.strip() if payload.full_name else None,
         role=payload.role,
         status="active",
         require_mfa=payload.require_mfa,
+        allowed_pages=allowed_pages_json,
         created_by_user_id=current_super_admin.id,
     )
     db.add(row)
@@ -168,6 +188,11 @@ def update_allowlist_entry(
     if payload.require_mfa is not None and payload.require_mfa != row.require_mfa:
         row.require_mfa = payload.require_mfa
         changed = True
+    if payload.allowed_pages is not None:
+        allowed_pages_json = json.dumps(payload.allowed_pages) if payload.allowed_pages else None
+        if allowed_pages_json != row.allowed_pages:
+            row.allowed_pages = allowed_pages_json
+            changed = True
 
     if changed:
         db.add(row)

@@ -131,42 +131,7 @@ def _kyc_eligibility_message(has_funded_account: bool) -> str:
     return "You are not eligible for KYC yet. You must have at least one funded account first."
 
 
-def _sync_bank_directory(db: Session) -> list[BankDirectory]:
-    fetched = query_bank_list()
-    existing = db.scalars(select(BankDirectory)).all()
-    by_code = {row.bank_code: row for row in existing}
-    seen_codes: set[str] = set()
 
-    for item in fetched:
-        code = str(item["bank_code"])
-        seen_codes.add(code)
-        row = by_code.get(code)
-        if row is None:
-            row = BankDirectory(
-                bank_code=code,
-                bank_name=str(item["bank_name"]),
-                bank_url=item.get("bank_url"),
-                bg_url=item.get("bg_url"),
-                bg2_url=item.get("bg2_url"),
-                is_active=True,
-            )
-            db.add(row)
-            by_code[code] = row
-        else:
-            row.bank_name = str(item["bank_name"])
-            row.bank_url = item.get("bank_url")
-            row.bg_url = item.get("bg_url")
-            row.bg2_url = item.get("bg2_url")
-            row.is_active = True
-            db.add(row)
-
-    for row in existing:
-        if row.bank_code not in seen_codes:
-            row.is_active = False
-            db.add(row)
-
-    db.commit()
-    return db.scalars(select(BankDirectory).where(BankDirectory.is_active.is_(True)).order_by(BankDirectory.bank_name.asc())).all()
 
 
 @router.get("/me")

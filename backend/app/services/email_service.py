@@ -585,3 +585,82 @@ def send_kyc_approved_email(*, to_email: str, account_name: str, bank_name: str,
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="Unable to reach Resend API",
         ) from exc
+
+
+def _render_announcement_html_template(subject: str, message: str) -> str:
+    html = HTML_TEMPLATE_PATH.read_text(encoding="utf-8")
+    html = html.replace("YOUR OTP VALIDATION CODE", subject.upper())
+    html = html.replace("OTP Code: 681248", message.replace("\n", "<br>"))
+    html = html.replace("images/e33cabf818e9c488dbe37cf73f4024b5.jpg", HERO_IMAGE_URL)
+    html = html.replace(
+        "You are attempting to access a secure area that requires One-Time Password (OTP) verification. Please use the code below to proceed with your request:",
+        "Here's an important announcement from NairaTrader:",
+    )
+    html = html.replace(
+        "This code is valid for one-time use only and will expire within five minutes. If you did not initiate this request, please ignore this message.",
+        "Thank you for being part of the NairaTrader community. We're committed to providing you with the best trading experience.",
+    )
+    return html
+
+
+def _render_announcement_text_template(subject: str, message: str) -> str:
+    text = TEXT_TEMPLATE_PATH.read_text(encoding="utf-8")
+    text = text.replace("YOUR OTP VALIDATION CODE", subject.upper())
+    text = text.replace("OTP Code: 681248", message)
+    text = text.replace(
+        "You are attempting to access a secure area that requires One-Time Password (OTP) verification. Please use the code below to proceed with your request:",
+        "Here's an important announcement from NairaTrader:",
+    )
+    text = text.replace(
+        "This code is valid for one-time use only and will expire within five minutes. If you did not initiate this request, please ignore this message.",
+        "Thank you for being part of the NairaTrader community. We're committed to providing you with the best trading experience.",
+    )
+    return text
+
+
+def send_announcement_email(*, to_emails: list[str], subject: str, message: str) -> None:
+    """Send announcement emails to multiple recipients using the professional NairaTrader template."""
+    if not settings.resend_api_key:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="RESEND_API_KEY is not configured",
+        )
+
+    payload = {
+        "from": settings.resend_from_email,
+        "to": to_emails,
+        "subject": f"📢 {subject} - NairaTrader",
+        "html": _render_announcement_html_template(subject, message),
+        "text": _render_announcement_text_template(subject, message),
+    }
+
+    request = Request(
+        url=f"{settings.resend_api_base_url}/emails",
+        data=json.dumps(payload).encode("utf-8"),
+        headers={
+            "Authorization": f"Bearer {settings.resend_api_key}",
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "User-Agent": "NairaTrader-Backend/1.0 (+https://nairatrader.is)",
+        },
+        method="POST",
+    )
+
+    try:
+        with urlopen(request, timeout=30) as response:  # Longer timeout for bulk emails
+            if response.status >= 400:
+                raise HTTPException(
+                    status_code=status.HTTP_502_BAD_GATEWAY,
+                    detail="Failed to send announcement email",
+                )
+    except HTTPError as exc:
+        error_detail = exc.read().decode("utf-8", errors="ignore")
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Resend API error: {error_detail or exc.reason}",
+        ) from exc
+    except URLError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Unable to reach Resend API",
+        ) from exc

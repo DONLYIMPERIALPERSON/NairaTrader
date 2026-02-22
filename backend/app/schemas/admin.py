@@ -8,6 +8,7 @@ class AdminAllowlistCreateRequest(BaseModel):
     full_name: str | None = Field(default=None, min_length=1, max_length=255)
     role: str = Field(default="admin", pattern="^(admin|super_admin)$")
     require_mfa: bool = True
+    allowed_pages: list[str] | None = Field(default=None, description="List of allowed page IDs for this admin")
 
 
 class AdminAllowlistUpdateRequest(BaseModel):
@@ -17,3 +18,4 @@ class AdminAllowlistUpdateRequest(BaseModel):
     role: str | None = Field(default=None, pattern="^(admin|super_admin)$")
     status: str | None = Field(default=None, pattern="^(active|disabled)$")
     require_mfa: bool | None = None
+    allowed_pages: list[str] | None = Field(default=None, description="List of allowed page IDs for this admin")

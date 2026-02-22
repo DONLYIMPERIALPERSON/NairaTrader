@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, ForeignKey, String
+from sqlalchemy import Boolean, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -15,4 +15,5 @@ class AdminAllowlist(Base):
     status: Mapped[str] = mapped_column(String(50), nullable=False, default="active")
     require_mfa: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     mfa_enrolled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    allowed_pages: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON string of allowed page IDs
     created_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)

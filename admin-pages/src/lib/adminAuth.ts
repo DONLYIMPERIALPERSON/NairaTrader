@@ -21,6 +21,7 @@ export type AdminAuthMeResponse = {
   nick_name?: string | null
   role: string
   status: string
+  allowed_pages?: string[]
 }
 
 export type AdminEmailPrecheckResponse = {
@@ -123,6 +124,10 @@ export type ChallengeAccountListItem = {
   breached_reason?: string | null
   breached_at?: string | null
   passed_at?: string | null
+  // Additional fields for profitable accounts
+  rank?: number
+  profit?: string
+  win_rate?: string
 }
 
 export type ChallengeBreachListItem = {
@@ -527,10 +532,26 @@ export async function fetchChallengeAccounts(sessionToken?: string): Promise<Cha
   return response.json() as Promise<ChallengeAccountsResponse>
 }
 
+export async function fetchActiveChallengeAccounts(sessionToken?: string): Promise<ChallengeAccountsResponse> {
+  const response = await authFetch('/admin/challenge-accounts/active', {}, sessionToken)
+  if (!response.ok) {
+    throw await parseBackendError('Failed to load active challenge accounts', response)
+  }
+  return response.json() as Promise<ChallengeAccountsResponse>
+}
+
 export async function fetchFundedChallengeAccounts(sessionToken?: string): Promise<ChallengeAccountsResponse> {
   const response = await authFetch('/admin/challenge-accounts/funded', {}, sessionToken)
   if (!response.ok) {
     throw await parseBackendError('Failed to load funded challenge accounts', response)
+  }
+  return response.json() as Promise<ChallengeAccountsResponse>
+}
+
+export async function fetchProfitableFundedAccounts(sessionToken?: string): Promise<ChallengeAccountsResponse> {
+  const response = await authFetch('/admin/challenge-accounts/funded/profitable', {}, sessionToken)
+  if (!response.ok) {
+    throw await parseBackendError('Failed to load profitable funded accounts', response)
   }
   return response.json() as Promise<ChallengeAccountsResponse>
 }
@@ -848,4 +869,727 @@ export async function markSupportChatAsRead(chatId: string, sessionToken?: strin
     throw await parseBackendError('Failed to mark support chat as read', response)
   }
   return response.json() as Promise<{ message: string }>
+}
+
+export type AdminAllowlistEntry = {
+  id: number
+  email: string
+  full_name: string | null
+  descope_user_id: string | null
+  role: string
+  status: string
+  require_mfa: boolean
+  mfa_enrolled: boolean
+  allowed_pages: string[] | null
+  created_by_user_id: number | null
+}
+
+export type AdminAllowlistResponse = {
+  admins: AdminAllowlistEntry[]
+}
+
+export async function fetchAdminAllowlist(sessionToken?: string): Promise<AdminAllowlistResponse> {
+  const response = await authFetch('/admin/auth/allowlist', {}, sessionToken)
+  if (!response.ok) {
+    throw await parseBackendError('Failed to load admin allowlist', response)
+  }
+  const data = await response.json() as AdminAllowlistEntry[]
+  return { admins: data }
+}
+
+export async function createAdminAllowlistEntry(
+  payload: {
+    email: string
+    full_name?: string
+    role: 'admin' | 'super_admin'
+    require_mfa?: boolean
+    allowed_pages?: string[]
+  },
+  sessionToken?: string,
+): Promise<AdminAllowlistEntry> {
+  const response = await authFetch(
+    '/admin/auth/allowlist',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    },
+    sessionToken,
+  )
+  if (!response.ok) {
+    throw await parseBackendError('Failed to create admin allowlist entry', response)
+  }
+  return response.json() as Promise<AdminAllowlistEntry>
+}
+
+export async function updateAdminAllowlistEntry(
+  entryId: number,
+  payload: {
+    full_name?: string
+    role?: 'admin' | 'super_admin'
+    status?: 'active' | 'disabled'
+    require_mfa?: boolean
+    allowed_pages?: string[]
+  },
+  sessionToken?: string,
+): Promise<AdminAllowlistEntry> {
+  const response = await authFetch(
+    `/admin/auth/allowlist/${entryId}`,
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    },
+    sessionToken,
+  )
+  if (!response.ok) {
+    throw await parseBackendError('Failed to update admin allowlist entry', response)
+  }
+  return response.json() as Promise<AdminAllowlistEntry>
+}
+
+export type SendAnnouncementRequest = {
+  subject: string
+  message: string
+}
+
+export type SendAnnouncementResponse = {
+  message: string
+  recipient_count?: number
+}
+
+export async function sendAnnouncement(
+  payload: SendAnnouncementRequest,
+  sessionToken?: string,
+): Promise<SendAnnouncementResponse> {
+  const response = await authFetch(
+    '/admin/announcements/send',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    },
+    sessionToken,
+  )
+  if (!response.ok) {
+    throw await parseBackendError('Failed to send announcement', response)
+  }
+  return response.json() as Promise<SendAnnouncementResponse>
+}
+
+export async function sendTestAnnouncement(
+  payload: SendAnnouncementRequest,
+  sessionToken?: string,
+): Promise<SendAnnouncementResponse> {
+  const response = await authFetch(
+    '/admin/announcements/send-test',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    },
+    sessionToken,
+  )
+  if (!response.ok) {
+    throw await parseBackendError('Failed to send test announcement', response)
+  }
+  return response.json() as Promise<SendAnnouncementResponse>
+}
+
+export async function fetchMonthlyFinanceStats(sessionToken?: string): Promise<{ monthlyFinance: Array<{ month: string; totalPurchase: string; totalPayouts: string }> }> {
+  const response = await authFetch('/admin/finance/monthly-stats', {}, sessionToken)
+  if (!response.ok) {
+    throw await parseBackendError('Failed to load monthly finance stats', response)
+  }
+  return response.json() as Promise<{ monthlyFinance: Array<{ month: string; totalPurchase: string; totalPayouts: string }> }>
+}
+
+export async function fetchDashboardStats(sessionToken?: string): Promise<{
+  kpis: {
+    totalRevenue: string
+    totalRevenueChange: number
+    todaySales: string
+    todaySalesChange: number
+    totalPayouts: string
+    totalPayoutsChange: number
+    newSignups: number
+    newSignupsChange: number
+    activeChallengeAccounts: number
+    activeChallengeAccountsChange: number
+    passRate: string
+    passRateChange: number
+    pendingPayoutRequests: string
+    pendingPayoutRequestsChange: number
+    todayApprovedPayouts: string
+    todayApprovedPayoutsChange: number
+  }
+  operationsQueues: {
+    payoutsPendingReview: number
+    payoutsOldestHours: number
+    supportTicketsOpen: number
+    supportTicketsOldestHours: number
+    provisioningFailures: number
+    webhookFailures: number
+  }
+  challengeOutcomes: {
+    passed: number
+    failed: number
+    expired: number
+  }
+  accountCounts: {
+    ready: number
+    phase1: number
+    phase2: number
+    funded: number
+  }
+  supportOverview: {
+    openTickets: number
+    avgFirstResponse: string
+    avgResolution: string
+  }
+  systemHealth: {
+    brokerBridge: string
+    tradeIngestionLag: string
+    webhooksSuccess: string
+    emailBounce: string
+    kycProvider: string
+  }
+}> {
+  const response = await authFetch('/admin/finance/dashboard-stats', {}, sessionToken)
+  if (!response.ok) {
+    throw await parseBackendError('Failed to load dashboard stats', response)
+  }
+  return response.json() as Promise<{
+    kpis: {
+      totalRevenue: string
+      totalRevenueChange: number
+      todaySales: string
+      todaySalesChange: number
+      totalPayouts: string
+      totalPayoutsChange: number
+      newSignups: number
+      newSignupsChange: number
+      activeChallengeAccounts: number
+      activeChallengeAccountsChange: number
+      passRate: string
+      passRateChange: number
+      pendingPayoutRequests: string
+      pendingPayoutRequestsChange: number
+      todayApprovedPayouts: string
+      todayApprovedPayoutsChange: number
+    }
+    operationsQueues: {
+      payoutsPendingReview: number
+      payoutsOldestHours: number
+      supportTicketsOpen: number
+      supportTicketsOldestHours: number
+      provisioningFailures: number
+      webhookFailures: number
+    }
+    challengeOutcomes: {
+      passed: number
+      failed: number
+      expired: number
+    }
+    accountCounts: {
+      ready: number
+      phase1: number
+      phase2: number
+      funded: number
+    }
+    supportOverview: {
+      openTickets: number
+      avgFirstResponse: string
+      avgResolution: string
+    }
+    systemHealth: {
+      brokerBridge: string
+      tradeIngestionLag: string
+      webhooksSuccess: string
+      emailBounce: string
+      kycProvider: string
+    }
+  }>
+}
+
+export type AffiliateOverviewStats = {
+  total_affiliates: number
+  total_commissions: number
+  total_paid_out: number
+  pending_payouts_count: number
+  pending_payouts_sum: number
+  pending_milestones: number
+  unique_purchasers: number
+}
+
+export type AffiliateCommission = {
+  id: number
+  date: string
+  affiliate: string
+  order_id: number
+  customer: string
+  amount: number
+  status: string
+  product_summary: string | null
+}
+
+export type AffiliatePayout = {
+  id: number
+  affiliate: string
+  amount: number
+  status: string
+  bank_details: string
+  requested_at: string
+  approved_at: string | null
+}
+
+export type AffiliateMilestone = {
+  id: number
+  affiliate: string
+  level: number
+  status: string
+  requested_at: string
+  processed_at: string | null
+}
+
+export type AffiliateCommissionsResponse = {
+  commissions: AffiliateCommission[]
+  pagination: {
+    page: number
+    per_page: number
+    total: number
+    total_pages: number
+  }
+}
+
+export type AffiliatePayoutsResponse = {
+  payouts: AffiliatePayout[]
+  pagination: {
+    page: number
+    per_page: number
+    total: number
+    total_pages: number
+  }
+}
+
+export type AffiliateMilestonesResponse = {
+  milestones: AffiliateMilestone[]
+  pagination: {
+    page: number
+    per_page: number
+    total: number
+    total_pages: number
+  }
+}
+
+export async function fetchAffiliateOverview(sessionToken?: string): Promise<AffiliateOverviewStats> {
+  const response = await authFetch('/admin/affiliate/overview', {}, sessionToken)
+  if (!response.ok) {
+    throw await parseBackendError('Failed to load affiliate overview', response)
+  }
+  return response.json() as Promise<AffiliateOverviewStats>
+}
+
+export async function fetchAffiliateCommissions(
+  page: number = 1,
+  perPage: number = 50,
+  sessionToken?: string,
+): Promise<AffiliateCommissionsResponse> {
+  const params = new URLSearchParams({
+    page: page.toString(),
+    per_page: perPage.toString(),
+  })
+
+  const response = await authFetch(`/admin/affiliate/commissions?${params.toString()}`, {}, sessionToken)
+  if (!response.ok) {
+    throw await parseBackendError('Failed to load affiliate commissions', response)
+  }
+  return response.json() as Promise<AffiliateCommissionsResponse>
+}
+
+export async function fetchAffiliatePayouts(
+  page: number = 1,
+  perPage: number = 50,
+  statusFilter?: string,
+  sessionToken?: string,
+): Promise<AffiliatePayoutsResponse> {
+  const params = new URLSearchParams({
+    page: page.toString(),
+    per_page: perPage.toString(),
+  })
+  if (statusFilter) params.append('status_filter', statusFilter)
+
+  const response = await authFetch(`/admin/affiliate/payouts?${params.toString()}`, {}, sessionToken)
+  if (!response.ok) {
+    throw await parseBackendError('Failed to load affiliate payouts', response)
+  }
+  return response.json() as Promise<AffiliatePayoutsResponse>
+}
+
+export async function fetchAffiliateMilestones(
+  page: number = 1,
+  perPage: number = 50,
+  statusFilter?: string,
+  sessionToken?: string,
+): Promise<AffiliateMilestonesResponse> {
+  const params = new URLSearchParams({
+    page: page.toString(),
+    per_page: perPage.toString(),
+  })
+  if (statusFilter) params.append('status_filter', statusFilter)
+
+  const response = await authFetch(`/admin/affiliate/milestones?${params.toString()}`, {}, sessionToken)
+  if (!response.ok) {
+    throw await parseBackendError('Failed to load affiliate milestones', response)
+  }
+  return response.json() as Promise<AffiliateMilestonesResponse>
+}
+
+export async function approveAffiliatePayout(payoutId: number, sessionToken?: string): Promise<{ message: string }> {
+  const response = await authFetch(`/admin/affiliate/payouts/${payoutId}/approve`, { method: 'POST' }, sessionToken)
+  if (!response.ok) {
+    throw await parseBackendError('Failed to approve affiliate payout', response)
+  }
+  return response.json() as Promise<{ message: string }>
+}
+
+export async function rejectAffiliatePayout(payoutId: number, reason?: string, sessionToken?: string): Promise<{ message: string }> {
+  const url = reason ? `/admin/affiliate/payouts/${payoutId}/reject?reason=${encodeURIComponent(reason)}` : `/admin/affiliate/payouts/${payoutId}/reject`
+  const response = await authFetch(url, { method: 'POST' }, sessionToken)
+  if (!response.ok) {
+    throw await parseBackendError('Failed to reject affiliate payout', response)
+  }
+  return response.json() as Promise<{ message: string }>
+}
+
+export async function approveAffiliateMilestone(milestoneId: number, sessionToken?: string): Promise<{ message: string }> {
+  const response = await authFetch(`/admin/affiliate/milestones/${milestoneId}/approve`, { method: 'POST' }, sessionToken)
+  if (!response.ok) {
+    throw await parseBackendError('Failed to approve affiliate milestone', response)
+  }
+  return response.json() as Promise<{ message: string }>
+}
+
+export async function rejectAffiliateMilestone(milestoneId: number, reason?: string, sessionToken?: string): Promise<{ message: string }> {
+  const url = reason ? `/admin/affiliate/milestones/${milestoneId}/reject?reason=${encodeURIComponent(reason)}` : `/admin/affiliate/milestones/${milestoneId}/reject`
+  const response = await authFetch(url, { method: 'POST' }, sessionToken)
+  if (!response.ok) {
+    throw await parseBackendError('Failed to reject affiliate milestone', response)
+  }
+  return response.json() as Promise<{ message: string }>
+}
+
+export type UserProfileData = {
+  user_id: number
+  name: string
+  email: string
+  status: string
+  trading: string
+  accounts: string
+  revenue: string
+  orders: string
+  payouts: string
+}
+
+export type UserChallengeAccount = {
+  challenge_id: string
+  user_id: number
+  trader_name: string | null
+  account_size: string
+  phase: 'Phase 1' | 'Phase 2' | 'Funded'
+  mt5_account: string | null
+  mt5_server: string | null
+  mt5_password: string | null
+  objective_status: string | null
+  breached_reason: string | null
+  breached_at: string | null
+  passed_at: string | null
+}
+
+export type UserOrder = {
+  id: number
+  provider_order_id: string
+  status: string
+  assignment_status: string
+  account_size: string
+  net_amount_formatted: string
+  created_at: string | null
+  paid_at: string | null
+  challenge_id: string | null
+}
+
+export type UserPayout = {
+  id: number
+  provider_order_id: string
+  status: string
+  amount_formatted: string
+  created_at: string | null
+  completed_at: string | null
+  account: {
+    challenge_id: string
+    account_size: string
+  }
+}
+
+export type UserSupportTicket = {
+  id: string
+  subject: string
+  status: 'open' | 'closed'
+  priority: 'low' | 'medium' | 'high'
+  assigned_to: string | null
+  user_name: string
+  user_email: string
+  created_at: string
+  updated_at: string
+  last_message: string
+  unread_count: number
+  user_unread_count: number
+}
+
+export async function fetchUserProfile(userId: number, sessionToken?: string): Promise<UserProfileData> {
+  const response = await authFetch(`/admin/users/${userId}`, {}, sessionToken)
+  if (!response.ok) {
+    throw await parseBackendError('Failed to load user profile', response)
+  }
+  return response.json() as Promise<UserProfileData>
+}
+
+export async function fetchUserChallengeAccounts(userId: number, sessionToken?: string): Promise<UserChallengeAccount[]> {
+  const response = await authFetch(`/admin/challenge-accounts?user_id=${userId}`, {}, sessionToken)
+  if (!response.ok) {
+    throw await parseBackendError('Failed to load user challenge accounts', response)
+  }
+  const data = await response.json() as { accounts: UserChallengeAccount[] }
+  return data.accounts
+}
+
+export async function fetchUserOrders(userId: number, page: number = 1, limit: number = 50, sessionToken?: string): Promise<{ orders: UserOrder[], pagination: any }> {
+  const params = new URLSearchParams({
+    page: page.toString(),
+    limit: limit.toString(),
+    search: userId.toString(), // Search by user ID
+  })
+
+  const response = await authFetch(`/admin/orders?${params.toString()}`, {}, sessionToken)
+  if (!response.ok) {
+    throw await parseBackendError('Failed to load user orders', response)
+  }
+  return response.json() as Promise<{ orders: UserOrder[], pagination: any }>
+}
+
+export async function fetchUserPayouts(userId: number, page: number = 1, limit: number = 50, sessionToken?: string): Promise<{ payouts: UserPayout[], pagination: any }> {
+  const params = new URLSearchParams({
+    page: page.toString(),
+    limit: limit.toString(),
+    search: userId.toString(), // Search by user ID
+  })
+
+  const response = await authFetch(`/admin/payouts?${params.toString()}`, {}, sessionToken)
+  if (!response.ok) {
+    throw await parseBackendError('Failed to load user payouts', response)
+  }
+  return response.json() as Promise<{ payouts: UserPayout[], pagination: any }>
+}
+
+export async function fetchUserSupportTickets(_userId: number, sessionToken?: string): Promise<UserSupportTicket[]> {
+  const response = await authFetch('/admin/support/chats', {}, sessionToken)
+  if (!response.ok) {
+    throw await parseBackendError('Failed to load support tickets', response)
+  }
+  const tickets = await response.json() as UserSupportTicket[]
+  // Filter tickets for this user
+  return tickets.filter(_ticket => {
+    // We need to get user info for each ticket, but the API doesn't return user_id
+    // For now, we'll return all tickets and let the frontend filter by user name/email
+    return true
+  })
+}
+
+export async function updateUserStatus(userId: number, status: 'active' | 'disabled', sessionToken?: string): Promise<{ message: string }> {
+  const response = await authFetch(`/admin/users/${userId}/status`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status }),
+  }, sessionToken)
+  if (!response.ok) {
+    throw await parseBackendError('Failed to update user status', response)
+  }
+  return response.json() as Promise<{ message: string }>
+}
+
+export async function disableUserWithdrawals(userId: number, sessionToken?: string): Promise<{ message: string }> {
+  const response = await authFetch(`/admin/users/${userId}/withdrawals`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ enabled: false }),
+  }, sessionToken)
+  if (!response.ok) {
+    throw await parseBackendError('Failed to disable user withdrawals', response)
+  }
+  return response.json() as Promise<{ message: string }>
+}
+
+export async function enableUserWithdrawals(userId: number, sessionToken?: string): Promise<{ message: string }> {
+  const response = await authFetch(`/admin/users/${userId}/withdrawals`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ enabled: true }),
+  }, sessionToken)
+  if (!response.ok) {
+    throw await parseBackendError('Failed to enable user withdrawals', response)
+  }
+  return response.json() as Promise<{ message: string }>
+}
+
+export async function suspendUser(userId: number, reason?: string, sessionToken?: string): Promise<{ message: string }> {
+  const response = await authFetch(`/admin/users/${userId}/suspend`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ reason }),
+  }, sessionToken)
+  if (!response.ok) {
+    throw await parseBackendError('Failed to suspend user', response)
+  }
+  return response.json() as Promise<{ message: string }>
+}
+
+export async function unsuspendUser(userId: number, sessionToken?: string): Promise<{ message: string }> {
+  const response = await authFetch(`/admin/users/${userId}/unsuspend`, { method: 'POST' }, sessionToken)
+  if (!response.ok) {
+    throw await parseBackendError('Failed to unsuspend user', response)
+  }
+  return response.json() as Promise<{ message: string }>
+}
+
+export async function banUser(userId: number, reason: string, duration?: string, sessionToken?: string): Promise<{ message: string }> {
+  const response = await authFetch(`/admin/users/${userId}/ban`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ reason, duration }),
+  }, sessionToken)
+  if (!response.ok) {
+    throw await parseBackendError('Failed to ban user', response)
+  }
+  return response.json() as Promise<{ message: string }>
+}
+
+export async function addUserNote(userId: number, note: string, tag?: string, sessionToken?: string): Promise<{ message: string }> {
+  const response = await authFetch(`/admin/users/${userId}/notes`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ note, tag }),
+  }, sessionToken)
+  if (!response.ok) {
+    throw await parseBackendError('Failed to add user note', response)
+  }
+  return response.json() as Promise<{ message: string }>
+}
+
+export async function sendUserEmail(userId: number, subject: string, message: string, template?: string, sessionToken?: string): Promise<{ message: string }> {
+  const response = await authFetch(`/admin/users/${userId}/email`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ subject, message, template }),
+  }, sessionToken)
+  if (!response.ok) {
+    throw await parseBackendError('Failed to send user email', response)
+  }
+  return response.json() as Promise<{ message: string }>
+}
+
+export type AdminWorkboardStats = {
+  top_performer: {
+    admin_id: number
+    admin_name: string
+    role: string
+    total_actions: number
+    performance_score: number
+    action_breakdown: Record<string, number>
+    avg_response_time: string
+    rank: number
+  } | null
+  admin_rankings: Array<{
+    admin_id: number
+    admin_name: string
+    role: string
+    total_actions: number
+    performance_score: number
+    action_breakdown: Record<string, number>
+    avg_response_time: string
+    rank: number
+  }>
+  recent_activities: Array<{
+    id: number
+    admin_name: string
+    action: string
+    description: string
+    time_ago: string
+  }>
+  summary: {
+    total_admins: number
+    total_actions: number
+    period_days: number
+  }
+}
+
+export type AdminActivity = {
+  id: number
+  admin_id: number
+  admin_name: string
+  action: string
+  description: string
+  entity_type: string
+  entity_id: number | null
+  metadata: string | null
+  created_at: string
+  time_ago: string
+}
+
+export type AdminActivitiesResponse = {
+  activities: AdminActivity[]
+  pagination: {
+    page: number
+    limit: number
+    total: number
+    total_pages: number
+  }
+  filters: {
+    admin_id: number | null
+    action: string | null
+    entity_type: string | null
+    days: number
+  }
+}
+
+export async function fetchAdminWorkboardStats(days: number = 30, sessionToken?: string): Promise<AdminWorkboardStats> {
+  const response = await authFetch(`/admin/workboard/stats?days=${days}`, {}, sessionToken)
+  if (!response.ok) {
+    throw await parseBackendError('Failed to load workboard stats', response)
+  }
+  return response.json() as Promise<AdminWorkboardStats>
+}
+
+export async function fetchAdminActivities(
+  page: number = 1,
+  limit: number = 50,
+  adminId?: number,
+  action?: string,
+  entityType?: string,
+  days: number = 7,
+  sessionToken?: string,
+): Promise<AdminActivitiesResponse> {
+  const params = new URLSearchParams({
+    page: page.toString(),
+    limit: limit.toString(),
+    days: days.toString(),
+  })
+  if (adminId) params.append('admin_id', adminId.toString())
+  if (action) params.append('action', action)
+  if (entityType) params.append('entity_type', entityType)
+
+  const response = await authFetch(`/admin/workboard/activities?${params.toString()}`, {}, sessionToken)
+  if (!response.ok) {
+    throw await parseBackendError('Failed to load admin activities', response)
+  }
+  return response.json() as Promise<AdminActivitiesResponse>
 }

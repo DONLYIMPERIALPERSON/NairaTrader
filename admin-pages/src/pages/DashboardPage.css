@@ -163,6 +163,23 @@
   color: #facc15;
 }
 
+.status-chip.error {
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+}
+
+.analysis-note {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 12px;
+  margin-bottom: 12px;
+  font-style: italic;
+}
+
+.error {
+  color: #ef4444;
+  font-weight: 600;
+}
+
 @media (max-width: 1200px) {
   .analysis-topbar-filters {
     grid-template-columns: repeat(2, minmax(0, 1fr));

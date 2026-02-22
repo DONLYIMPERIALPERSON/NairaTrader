@@ -261,7 +261,14 @@ function App() {
       <AdminHeader roleLabel={roleLabel} fullName={authUser.full_name || authUser.email} />
 
       <div className="admin-dashboard-body">
-        <AdminSidebar activePage={activePage} onNavigate={setActivePage} onLogout={handleAdminLogout} isLoggingOut={isLoggingOut} />
+        <AdminSidebar
+          activePage={activePage}
+          onNavigate={setActivePage}
+          onLogout={handleAdminLogout}
+          isLoggingOut={isLoggingOut}
+          allowedPages={authUser.allowed_pages}
+          userRole={authUser.role}
+        />
 
         <main className="admin-dashboard-content">
           {activePage === 'analysis' && <DashboardPage onNavigate={setActivePage} />}
@@ -279,7 +286,7 @@ function App() {
           {activePage === 'supportTickets' && <SupportTicketsPage onOpenProfile={handleOpenUserProfile} />}
           {activePage === 'settings' && <SettingsPage />}
           {activePage === 'kycReview' && <KycReviewPage onOpenProfile={handleOpenUserProfile} />}
-          {activePage === 'referrals' && <ReferralsPage onOpenProfile={handleOpenUserProfile} />}
+          {activePage === 'referrals' && <ReferralsPage />}
           {activePage === 'userProfile' && selectedUser && (
             <UserProfilePage user={selectedUser} onBack={handleBackToUsers} />
           )}

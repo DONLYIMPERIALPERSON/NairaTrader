@@ -3,6 +3,7 @@ import { getSessionToken } from '@descope/react-sdk'
 import {
   fetchAdminHeroStats,
   fetchAdminChallengeConfig,
+  fetchMonthlyFinanceStats,
   type HeroStatsConfig,
   sendAdminChallengeConfigOtp,
   type ChallengePlanConfig,
@@ -64,13 +65,8 @@ const defaultHeroStats: HeroStatsConfig = {
 }
 
 const FinanceAnalysisPage = () => {
-  const monthlyFinance = [
-    { month: 'Jan 2026', totalPurchase: '₦142,800,000', totalPayouts: '₦29,400,000' },
-    { month: 'Feb 2026', totalPurchase: '₦128,420,000', totalPayouts: '₦18,900,000' },
-    { month: 'Mar 2026', totalPurchase: '₦151,260,000', totalPayouts: '₦34,180,000' },
-  ]
-
-  const [selectedMonth, setSelectedMonth] = useState(monthlyFinance[1].month)
+  const [monthlyFinance, setMonthlyFinance] = useState<Array<{ month: string; totalPurchase: string; totalPayouts: string }>>([])
+  const [selectedMonth, setSelectedMonth] = useState('')
   const [accountPricing, setAccountPricing] = useState<AccountPriceItem[]>([
     { id: '200k', accountSize: '₦200k Account', price: '₦8,900', payoutPercent: '70', withdrawalFrequencyHours: '24', profitCapPercent: '100', maxDrawdownPercent: '20', profitTargetPercent: '10', phases: '2', minTradingDays: '1', enabled: true, status: 'Available' },
     { id: '400k', accountSize: '₦400k Account', price: '₦18,500', payoutPercent: '70', withdrawalFrequencyHours: '24', profitCapPercent: '100', maxDrawdownPercent: '20', profitTargetPercent: '10', phases: '2', minTradingDays: '1', enabled: true, status: 'Available' },
@@ -113,13 +109,19 @@ const FinanceAnalysisPage = () => {
 
     const loadConfig = async () => {
       try {
-        const [challengeResponse, heroStatsResponse] = await Promise.all([
+        const [challengeResponse, heroStatsResponse, financeResponse] = await Promise.all([
           fetchAdminChallengeConfig(),
           fetchAdminHeroStats(),
+          fetchMonthlyFinanceStats(),
         ])
         if (!mounted) return
         setAccountPricing(challengeResponse.plans.map(mapPlanToAccountPricing))
         setHeroStats(heroStatsResponse.stats)
+        setMonthlyFinance(financeResponse.monthlyFinance)
+        // Set the most recent month as selected by default
+        if (financeResponse.monthlyFinance.length > 0) {
+          setSelectedMonth(financeResponse.monthlyFinance[0].month)
+        }
       } catch {
         if (!mounted) return
         setAuthError('Could not load challenge config from backend. Showing local values.')
@@ -135,8 +137,8 @@ const FinanceAnalysisPage = () => {
   }, [])
 
   const selectedMonthFinance = useMemo(
-    () => monthlyFinance.find((entry) => entry.month === selectedMonth) ?? monthlyFinance[0],
-    [selectedMonth],
+    () => monthlyFinance.find((entry) => entry.month === selectedMonth) ?? (monthlyFinance.length > 0 ? monthlyFinance[0] : { month: '', totalPurchase: '₦0', totalPayouts: '₦0' }),
+    [selectedMonth, monthlyFinance],
   )
 
   const closeEditModal = () => {
@@ -346,10 +348,14 @@ const FinanceAnalysisPage = () => {
         <div className="analysis-topbar-filters">
           <label>
             Month
-            <select value={selectedMonth} onChange={(event) => setSelectedMonth(event.target.value)}>
-              {monthlyFinance.map((entry) => (
-                <option key={entry.month} value={entry.month}>{entry.month}</option>
-              ))}
+            <select value={selectedMonth} onChange={(event) => setSelectedMonth(event.target.value)} disabled={monthlyFinance.length === 0}>
+              {monthlyFinance.length === 0 ? (
+                <option value="">Loading...</option>
+              ) : (
+                monthlyFinance.map((entry) => (
+                  <option key={entry.month} value={entry.month}>{entry.month}</option>
+                ))
+              )}
             </select>
           </label>
         </div>
@@ -357,11 +363,11 @@ const FinanceAnalysisPage = () => {
 
       <div className="admin-kpi-grid analysis-kpi-grid">
         <article className="admin-kpi-card analysis-kpi-card">
-          <h3>Total Purchase ({selectedMonth})</h3>
+          <h3>Total Purchase ({selectedMonth || 'Loading...'})</h3>
           <strong>{selectedMonthFinance.totalPurchase}</strong>
         </article>
         <article className="admin-kpi-card analysis-kpi-card">
-          <h3>Total Payouts ({selectedMonth})</h3>
+          <h3>Total Payouts ({selectedMonth || 'Loading...'})</h3>
           <strong>{selectedMonthFinance.totalPayouts}</strong>
         </article>
       </div>

@@ -15,11 +15,8 @@ from app.models.affiliate import (
     AffiliateClick,
 )
 from app.models.user import User
-from app.schemas.affiliate import (
-    AffiliateCommission,
-    AffiliatePayout,
-    AffiliateMilestone,
-)
+from app.api.admin_workboard_routes import log_admin_activity
+
 
 router = APIRouter(prefix="/admin/affiliate", tags=["Admin Affiliate"])
 
@@ -31,7 +28,7 @@ def get_affiliate_overview(
 ) -> dict:
     """Get affiliate overview statistics."""
     # Total affiliates
-    total_affiliates = db.scalar(select(func.count(Affiliate.id)))
+    total_affiliates = db.scalar(select(func.count(Affiliate.user_id)))
 
     # Total commissions (approved)
     total_commissions = db.scalar(
@@ -97,10 +94,9 @@ def get_commissions(
     # Get total count
     total = db.scalar(select(func.count(AffiliateCommission.id)))
 
-    # Get paginated results
+    # Get paginated results with affiliate user info
     commissions = db.scalars(
         select(AffiliateCommission)
-        .options(db.joinedload(AffiliateCommission.affiliate_rel))
         .order_by(desc(AffiliateCommission.created_at))
         .offset(offset)
         .limit(per_page)
@@ -109,9 +105,11 @@ def get_commissions(
     # Format for response
     commission_list = []
     for comm in commissions:
-        affiliate_name = "Unknown"
-        if comm.affiliate_rel and comm.affiliate_rel.user:
-            affiliate_name = comm.affiliate_rel.user.username or f"User #{comm.affiliate_id}"
+        # Get affiliate user info
+        affiliate_user = db.scalar(
+            select(User).where(User.id == comm.affiliate_id)
+        )
+        affiliate_name = affiliate_user.username if affiliate_user else f"User #{comm.affiliate_id}"
 
         commission_list.append({
             "id": comm.id,
@@ -152,7 +150,7 @@ def get_payouts(
     offset = (page - 1) * per_page
 
     # Build query
-    query = select(AffiliatePayout).options(db.joinedload(AffiliatePayout.affiliate_rel))
+    query = select(AffiliatePayout)
 
     if status_filter in ["pending", "approved", "rejected"]:
         query = query.where(AffiliatePayout.status == status_filter)
@@ -173,25 +171,26 @@ def get_payouts(
     # Format for response
     payout_list = []
     for payout in payouts:
-        affiliate_name = "Unknown"
+        # Get affiliate user info
+        affiliate_user = db.scalar(
+            select(User).where(User.id == payout.affiliate_id)
+        )
+        affiliate_name = affiliate_user.username if affiliate_user else f"User #{payout.affiliate_id}"
+
+        # Get bank details
         bank_details = "Not set"
-
-        if payout.affiliate_rel and payout.affiliate_rel.user:
-            affiliate_name = payout.affiliate_rel.user.username or f"User #{payout.affiliate_id}"
-
-            # Get bank details
-            from app.models.user_bank_account import UserBankAccount
-            bank_account = db.scalar(
-                select(UserBankAccount).where(UserBankAccount.user_id == payout.affiliate_id)
-            )
-            if bank_account:
-                from app.data.banks import NIGERIAN_BANKS
-                bank_name = "Unknown Bank"
-                for bank in NIGERIAN_BANKS:
-                    if bank["bank_code"] == bank_account.bank_code:
-                        bank_name = bank["bank_name"]
-                        break
-                bank_details = f"{bank_account.account_name} — {bank_name} ({bank_account.bank_account_number})"
+        from app.models.user_bank_account import UserBankAccount
+        bank_account = db.scalar(
+            select(UserBankAccount).where(UserBankAccount.user_id == payout.affiliate_id)
+        )
+        if bank_account:
+            from app.data.banks import NIGERIAN_BANKS
+            bank_name = "Unknown Bank"
+            for bank in NIGERIAN_BANKS:
+                if bank["bank_code"] == bank_account.bank_code:
+                    bank_name = bank["bank_name"]
+                    break
+            bank_details = f"{bank_account.account_name} — {bank_name} ({bank_account.bank_account_number})"
 
         payout_list.append({
             "id": payout.id,
@@ -237,10 +236,24 @@ def approve_payout(
             detail="Payout is not pending",
         )
 
+    # Get affiliate info for logging
+    affiliate_user = db.scalar(
+        select(User).where(User.id == payout.affiliate_id)
+    )
+    affiliate_name = affiliate_user.username if affiliate_user else f"User #{payout.affiliate_id}"
+
     # Update payout status
     payout.status = "approved"
     payout.approved_at = datetime.utcnow()
     db.commit()
+
+    # Log admin activity
+    admin_name = current_admin.email  # Use email as admin identifier
+    log_admin_activity(
+        db, current_admin.id, admin_name, "approve_payout",
+        f"Approved affiliate payout of ₦{payout.amount:,.2f} for {affiliate_name}",
+        "payout", payout_id
+    )
 
     # TODO: Send email notification to affiliate
 
@@ -271,10 +284,27 @@ def reject_payout(
             detail="Payout is not pending",
         )
 
+    # Get affiliate info for logging
+    affiliate_user = db.scalar(
+        select(User).where(User.id == payout.affiliate_id)
+    )
+    affiliate_name = affiliate_user.username if affiliate_user else f"User #{payout.affiliate_id}"
+
     # Update payout status
     payout.status = "rejected"
     payout.approved_at = datetime.utcnow()
     db.commit()
+
+    # Log admin activity
+    admin_name = current_admin.email
+    description = f"Rejected affiliate payout of ₦{payout.amount:,.2f} for {affiliate_name}"
+    if reason:
+        description += f" (Reason: {reason})"
+
+    log_admin_activity(
+        db, current_admin.id, admin_name, "reject_payout",
+        description, "payout", payout_id
+    )
 
     # TODO: Send email notification to affiliate with reason
 
@@ -298,7 +328,7 @@ def get_milestones(
     offset = (page - 1) * per_page
 
     # Build query
-    query = select(AffiliateMilestone).options(db.joinedload(AffiliateMilestone.affiliate_rel))
+    query = select(AffiliateMilestone)
 
     if status_filter in ["pending", "approved", "rejected"]:
         query = query.where(AffiliateMilestone.status == status_filter)
@@ -319,9 +349,11 @@ def get_milestones(
     # Format for response
     milestone_list = []
     for milestone in milestones:
-        affiliate_name = "Unknown"
-        if milestone.affiliate_rel and milestone.affiliate_rel.user:
-            affiliate_name = milestone.affiliate_rel.user.username or f"User #{milestone.affiliate_id}"
+        # Get affiliate user info
+        affiliate_user = db.scalar(
+            select(User).where(User.id == milestone.affiliate_id)
+        )
+        affiliate_name = affiliate_user.username if affiliate_user else f"User #{milestone.affiliate_id}"
 
         milestone_list.append({
             "id": milestone.id,
@@ -366,10 +398,24 @@ def approve_milestone(
             detail="Milestone is not pending",
         )
 
+    # Get affiliate info for logging
+    affiliate_user = db.scalar(
+        select(User).where(User.id == milestone.affiliate_id)
+    )
+    affiliate_name = affiliate_user.username if affiliate_user else f"User #{milestone.affiliate_id}"
+
     # Update milestone status
     milestone.status = "approved"
     milestone.processed_at = datetime.utcnow()
     db.commit()
+
+    # Log admin activity
+    admin_name = current_admin.email
+    log_admin_activity(
+        db, current_admin.id, admin_name, "approve_milestone",
+        f"Approved milestone reward (Level {milestone.level}) for {affiliate_name}",
+        "milestone", milestone_id
+    )
 
     # TODO: Send email notification to affiliate
     # TODO: Create coupon or credit account
@@ -401,10 +447,27 @@ def reject_milestone(
             detail="Milestone is not pending",
         )
 
+    # Get affiliate info for logging
+    affiliate_user = db.scalar(
+        select(User).where(User.id == milestone.affiliate_id)
+    )
+    affiliate_name = affiliate_user.username if affiliate_user else f"User #{milestone.affiliate_id}"
+
     # Update milestone status
     milestone.status = "rejected"
     milestone.processed_at = datetime.utcnow()
     db.commit()
+
+    # Log admin activity
+    admin_name = current_admin.email
+    description = f"Rejected milestone reward (Level {milestone.level}) for {affiliate_name}"
+    if reason:
+        description += f" (Reason: {reason})"
+
+    log_admin_activity(
+        db, current_admin.id, admin_name, "reject_milestone",
+        description, "milestone", milestone_id
+    )
 
     # TODO: Send email notification to affiliate with reason
 

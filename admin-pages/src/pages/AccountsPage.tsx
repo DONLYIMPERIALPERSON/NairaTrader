@@ -1,19 +1,16 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { AdminUser } from './UsersPage'
-import { fetchChallengeAccounts, type ChallengeAccountListItem } from '../lib/adminAuth'
+import { fetchActiveChallengeAccounts, type ChallengeAccountListItem } from '../lib/adminAuth'
 
 interface AccountsPageProps {
   onOpenProfile: (user: AdminUser) => void
 }
-
-type StatsWindow = 'today' | 'week' | 'month'
 
 const AccountsPage = ({ onOpenProfile }: AccountsPageProps) => {
   const [currentPage, setCurrentPage] = useState(1)
   const [rows, setRows] = useState<ChallengeAccountListItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [statsWindow, setStatsWindow] = useState<StatsWindow>('today')
   const rowsPerPage = 10
 
   useEffect(() => {
@@ -21,10 +18,10 @@ const AccountsPage = ({ onOpenProfile }: AccountsPageProps) => {
       setLoading(true)
       setError('')
       try {
-        const response = await fetchChallengeAccounts()
+        const response = await fetchActiveChallengeAccounts()
         setRows(response.accounts)
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load challenge accounts')
+        setError(err instanceof Error ? err.message : 'Failed to load active challenge accounts')
       } finally {
         setLoading(false)
       }
@@ -39,91 +36,15 @@ const AccountsPage = ({ onOpenProfile }: AccountsPageProps) => {
     return rows.slice(startIndex, startIndex + rowsPerPage)
   }, [rows, currentPage])
 
-  const inWindow = (iso: string | null | undefined) => {
-    if (!iso) return false
-    const target = new Date(iso)
-    if (Number.isNaN(target.getTime())) return false
-    const now = new Date()
-
-    if (statsWindow === 'today') {
-      return target.toDateString() === now.toDateString()
-    }
-
-    if (statsWindow === 'week') {
-      const day = now.getDay()
-      const mondayOffset = day === 0 ? -6 : 1 - day
-      const startOfWeek = new Date(now)
-      startOfWeek.setDate(now.getDate() + mondayOffset)
-      startOfWeek.setHours(0, 0, 0, 0)
-      return target >= startOfWeek
-    }
-
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
-    return target >= startOfMonth
-  }
-
-  const activeChallengesCount = rows.filter((row) => row.objective_status === 'active').length
-  const breachedCountForWindow = rows.filter((row) => row.objective_status === 'breached' && inWindow(row.breached_at)).length
-  const passedCountForWindow = rows.filter((row) => row.objective_status === 'passed' && inWindow(row.passed_at)).length
-  const statsWindowLabel = statsWindow === 'today' ? 'Today' : statsWindow === 'week' ? 'This Week' : 'This Month'
+  const activeChallengesCount = rows.length // All rows are active since we filter by active status
+  const phase1Count = rows.filter((row) => row.phase === 'Phase 1').length
+  const phase2Count = rows.filter((row) => row.phase === 'Phase 2').length
 
   return (
     <section className="admin-page-stack">
       <div className="admin-dashboard-card">
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-          <div>
-            <h2 style={{ marginBottom: 8 }}>Challenges</h2>
-            <p style={{ margin: 0 }}>Track challenge performance, breaches, passes, and MT5 details for each challenge account.</p>
-          </div>
-
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <button
-              type="button"
-              onClick={() => setStatsWindow('today')}
-              style={{
-                border: '1px solid #2a2f3a',
-                borderRadius: 10,
-                padding: '8px 12px',
-                fontWeight: 700,
-                color: statsWindow === 'today' ? '#111827' : '#d1d5db',
-                background: statsWindow === 'today' ? '#f59e0b' : '#111827',
-                cursor: 'pointer',
-              }}
-            >
-              Today
-            </button>
-            <button
-              type="button"
-              onClick={() => setStatsWindow('week')}
-              style={{
-                border: '1px solid #2a2f3a',
-                borderRadius: 10,
-                padding: '8px 12px',
-                fontWeight: 700,
-                color: statsWindow === 'week' ? '#111827' : '#d1d5db',
-                background: statsWindow === 'week' ? '#f59e0b' : '#111827',
-                cursor: 'pointer',
-              }}
-            >
-              This Week
-            </button>
-            <button
-              type="button"
-              onClick={() => setStatsWindow('month')}
-              style={{
-                border: '1px solid #2a2f3a',
-                borderRadius: 10,
-                padding: '8px 12px',
-                fontWeight: 700,
-                color: statsWindow === 'month' ? '#111827' : '#d1d5db',
-                background: statsWindow === 'month' ? '#f59e0b' : '#111827',
-                cursor: 'pointer',
-              }}
-            >
-              This Month
-            </button>
-          </div>
-        </div>
+        <h2>Active Challenges</h2>
+        <p>Track active Phase 1 and Phase 2 challenge performance, MT5 details, and trader progress for each ongoing challenge account.</p>
       </div>
 
       <div className="admin-kpi-grid">
@@ -132,12 +53,12 @@ const AccountsPage = ({ onOpenProfile }: AccountsPageProps) => {
           <strong>{activeChallengesCount}</strong>
         </article>
         <article className="admin-kpi-card">
-          <h3>Breached ({statsWindowLabel})</h3>
-          <strong>{breachedCountForWindow}</strong>
+          <h3>Phase 1</h3>
+          <strong>{phase1Count}</strong>
         </article>
         <article className="admin-kpi-card">
-          <h3>Passed ({statsWindowLabel})</h3>
-          <strong>{passedCountForWindow}</strong>
+          <h3>Phase 2</h3>
+          <strong>{phase2Count}</strong>
         </article>
       </div>
 

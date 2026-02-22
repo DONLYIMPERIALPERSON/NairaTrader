@@ -1,100 +1,128 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import {
+  fetchAdminAllowlist,
+  createAdminAllowlistEntry,
+  updateAdminAllowlistEntry,
+  type AdminAllowlistEntry,
+} from '../lib/adminAuth'
 import './SettingsPage.css'
 
 type SettingsTab = 'addAdmin' | 'admins'
 
-type AdminAccount = {
-  id: string
-  name: string
-  email: string
-  role: string
-  defaultPassword: string
-  allowedPages: string[]
+// Map page IDs to display names
+const pageIdToDisplayName: Record<string, string> = {
+  analysis: 'Analysis',
+  workBoard: 'Work Board',
+  users: 'All Users',
+  kycReview: 'KYC Review',
+  referrals: 'Affiliates',
+  payouts: 'Payout Requests',
+  orders: 'Orders',
+  financeAnalysis: 'Financial Analysis & Settings',
+  accounts: 'Challenges',
+  fundedAccounts: 'Funded Accounts',
+  breaches: 'Breaches',
+  mt5: 'MT5',
+  coupons: 'Coupons',
+  supportTickets: 'Support Tickets',
+  sendAnnouncement: 'Send Announcement',
+  settings: 'Settings',
 }
 
-const availablePages = [
-  'Analysis',
-  'Work Board',
-  'All Users',
-  'KYC Review',
-  'Affiliates',
-  'Payout Requests',
-  'Orders',
-  'Financial Analysis & Settings',
-  'Challenges',
-  'Funded Accounts',
-  'Breaches',
-  'MT5',
-  'Coupons',
-  'Support Tickets',
-  'Send Announcement',
-  'Settings',
-]
+const displayNameToPageId: Record<string, string> = Object.fromEntries(
+  Object.entries(pageIdToDisplayName).map(([id, name]) => [name, id])
+)
 
-const initialAdmins: AdminAccount[] = [
-  {
-    id: 'ADM-1001',
-    name: 'Support Agent',
-    email: 'support.agent@nairatrader.com',
-    role: 'Support Agent',
-    defaultPassword: 'St9#pQ2xLm',
-    allowedPages: ['Support Tickets', 'All Users', 'Settings'],
-  },
-  {
-    id: 'ADM-1002',
-    name: 'Finance Reviewer',
-    email: 'finance.reviewer@nairatrader.com',
-    role: 'Finance Admin',
-    defaultPassword: 'Fn7!mK4rTp',
-    allowedPages: ['Payout Requests', 'Orders', 'Financial Analysis & Settings'],
-  },
-]
-
-const generatePassword = () => {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#$'
-  return Array.from({ length: 10 })
-    .map(() => chars[Math.floor(Math.random() * chars.length)])
-    .join('')
-}
+const availablePages = Object.values(pageIdToDisplayName)
 
 const SettingsPage = () => {
   const [activeTab, setActiveTab] = useState<SettingsTab>('addAdmin')
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
-  const [role, setRole] = useState('Support Agent')
-  const [defaultPassword, setDefaultPassword] = useState(generatePassword())
+  const [role, setRole] = useState<'admin' | 'super_admin'>('admin')
+  const [requireMfa, setRequireMfa] = useState(true)
   const [selectedPages, setSelectedPages] = useState<string[]>(['Support Tickets'])
-  const [admins, setAdmins] = useState<AdminAccount[]>(initialAdmins)
+  const [admins, setAdmins] = useState<AdminAllowlistEntry[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [submitting, setSubmitting] = useState(false)
 
   const totalAdmins = useMemo(() => admins.length, [admins])
+
+  useEffect(() => {
+    loadAdmins()
+  }, [])
+
+  const loadAdmins = async () => {
+    try {
+      setLoading(true)
+      setError('')
+      const response = await fetchAdminAllowlist()
+      setAdmins(response.admins)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load admins')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const togglePage = (page: string) => {
     setSelectedPages((prev) => (prev.includes(page) ? prev.filter((p) => p !== page) : [...prev, page]))
   }
 
-  const createAdmin = () => {
+  const createAdmin = async () => {
     if (!name.trim() || !email.trim() || selectedPages.length === 0) return
 
-    const newAdmin: AdminAccount = {
-      id: `ADM-${Date.now()}`,
-      name: name.trim(),
-      email: email.trim().toLowerCase(),
-      role,
-      defaultPassword,
-      allowedPages: selectedPages,
-    }
+    try {
+      setSubmitting(true)
+      setError('')
 
-    setAdmins((prev) => [newAdmin, ...prev])
-    setName('')
-    setEmail('')
-    setRole('Support Agent')
-    setDefaultPassword(generatePassword())
-    setSelectedPages(['Support Tickets'])
-    setActiveTab('admins')
+      const pageIds = selectedPages.map(displayName => displayNameToPageId[displayName]).filter(Boolean)
+
+      await createAdminAllowlistEntry({
+        email: email.trim().toLowerCase(),
+        full_name: name.trim(),
+        role,
+        require_mfa: requireMfa,
+        allowed_pages: pageIds,
+      })
+
+      // Reload admins
+      await loadAdmins()
+
+      // Reset form
+      setName('')
+      setEmail('')
+      setRole('admin')
+      setRequireMfa(true)
+      setSelectedPages(['Support Tickets'])
+      setActiveTab('admins')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create admin')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
-  const deleteAdmin = (adminId: string) => {
-    setAdmins((prev) => prev.filter((admin) => admin.id !== adminId))
+  const updateAdmin = async (adminId: number, updates: {
+    full_name?: string
+    role?: 'admin' | 'super_admin'
+    status?: 'active' | 'disabled'
+    require_mfa?: boolean
+    allowed_pages?: string[]
+  }) => {
+    try {
+      setError('')
+      await updateAdminAllowlistEntry(adminId, updates)
+      await loadAdmins()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update admin')
+    }
+  }
+
+  const getAllowedPagesDisplay = (allowedPages: string[] | null) => {
+    if (!allowedPages || allowedPages.length === 0) return 'All Pages'
+    return allowedPages.map(pageId => pageIdToDisplayName[pageId] || pageId).join(', ')
   }
 
   return (
@@ -102,12 +130,13 @@ const SettingsPage = () => {
       <div className="admin-dashboard-card">
         <h2>Settings</h2>
         <p>Manage internal admin access and create support/admin accounts with page-level permissions.</p>
+        {error && <p style={{ color: '#fca5a5', marginTop: 8 }}>{error}</p>}
       </div>
 
       <div className="admin-kpi-grid">
         <article className="admin-kpi-card">
           <h3>Total Admins</h3>
-          <strong>{totalAdmins}</strong>
+          <strong>{loading ? '...' : totalAdmins}</strong>
         </article>
       </div>
 
@@ -135,16 +164,20 @@ const SettingsPage = () => {
             </label>
 
             <label>
-              Role Name
-              <input value={role} onChange={(event) => setRole(event.target.value)} placeholder="e.g. Support Agent" />
+              Role
+              <select value={role} onChange={(event) => setRole(event.target.value as 'admin' | 'super_admin')}>
+                <option value="admin">Admin</option>
+                <option value="super_admin">Super Admin</option>
+              </select>
             </label>
 
-            <label>
-              Default Password
-              <div className="settings-password-row">
-                <input value={defaultPassword} readOnly />
-                <button type="button" className="settings-generate-btn" onClick={() => setDefaultPassword(generatePassword())}>Generate</button>
-              </div>
+            <label className="settings-checkbox-label">
+              <input
+                type="checkbox"
+                checked={requireMfa}
+                onChange={(event) => setRequireMfa(event.target.checked)}
+              />
+              Require MFA
             </label>
 
             <div className="settings-pages-block">
@@ -164,7 +197,9 @@ const SettingsPage = () => {
             </div>
 
             <div className="settings-actions">
-              <button type="button" className="settings-create-btn" onClick={createAdmin}>Create Admin</button>
+              <button type="button" className="settings-create-btn" onClick={createAdmin} disabled={submitting}>
+                {submitting ? 'Creating...' : 'Create Admin'}
+              </button>
             </div>
           </div>
         </div>
@@ -173,38 +208,62 @@ const SettingsPage = () => {
       {activeTab === 'admins' && (
         <div className="admin-table-card">
           <h3 className="settings-title">Admin Accounts</h3>
-          <table className="admin-table">
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Email</th>
-                <th>Role</th>
-                <th>Default Password</th>
-                <th>Allowed Pages</th>
-                <th>Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {admins.map((admin) => (
-                <tr key={admin.id}>
-                  <td>{admin.name}</td>
-                  <td>{admin.email}</td>
-                  <td>{admin.role}</td>
-                  <td>{admin.defaultPassword}</td>
-                  <td>{admin.allowedPages.join(', ')}</td>
-                  <td>
-                    <button
-                      type="button"
-                      className="settings-delete-btn"
-                      onClick={() => deleteAdmin(admin.id)}
-                    >
-                      Delete
-                    </button>
-                  </td>
+          {loading ? (
+            <p>Loading admins...</p>
+          ) : (
+            <table className="admin-table">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Email</th>
+                  <th>Role</th>
+                  <th>Status</th>
+                  <th>MFA Required</th>
+                  <th>Allowed Pages</th>
+                  <th>Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {admins.map((admin) => (
+                  <tr key={admin.id}>
+                    <td>{admin.full_name || 'N/A'}</td>
+                    <td>{admin.email}</td>
+                    <td style={{ textTransform: 'capitalize' }}>{admin.role.replace('_', ' ')}</td>
+                    <td>
+                      <select
+                        value={admin.status}
+                        onChange={(event) => updateAdmin(admin.id, { status: event.target.value as 'active' | 'disabled' })}
+                        style={{ fontSize: '12px', padding: '2px 4px' }}
+                      >
+                        <option value="active">Active</option>
+                        <option value="disabled">Disabled</option>
+                      </select>
+                    </td>
+                    <td>
+                      <input
+                        type="checkbox"
+                        checked={admin.require_mfa}
+                        onChange={(event) => updateAdmin(admin.id, { require_mfa: event.target.checked })}
+                      />
+                    </td>
+                    <td>{getAllowedPagesDisplay(admin.allowed_pages)}</td>
+                    <td>
+                      <button
+                        type="button"
+                        className="settings-edit-btn"
+                        onClick={() => {
+                          // Could implement edit modal here
+                          alert('Edit functionality can be implemented with a modal')
+                        }}
+                      >
+                        Edit Pages
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
       )}
     </section>
