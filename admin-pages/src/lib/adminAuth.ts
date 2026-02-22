@@ -1405,6 +1405,64 @@ export async function fetchUserSupportTickets(_userId: number, sessionToken?: st
   })
 }
 
+export type MigrationRequest = {
+  id: number
+  user_id: number
+  user_name: string
+  user_email: string
+  request_type: 'phase2' | 'funded'
+  account_size: string
+  mt5_server: string
+  mt5_account_number: string
+  mt5_password: string
+  bank_account_number: string | null
+  bank_code: string | null
+  bank_name: string | null
+  account_name: string | null
+  status: 'pending' | 'approved' | 'declined'
+  admin_notes: string | null
+  withdrawal_amount: number | null
+  transfer_reference: string | null
+  created_at: string
+  processed_at: string | null
+  processed_by_admin_id: number | null
+}
+
+export async function fetchMigrationRequests(sessionToken?: string): Promise<MigrationRequest[]> {
+  const response = await authFetch('/admin/migration-requests', {}, sessionToken)
+  if (!response.ok) {
+    throw await parseBackendError('Failed to load migration requests', response)
+  }
+  return response.json() as Promise<MigrationRequest[]>
+}
+
+export async function updateMigrationRequestStatus(
+  requestId: number,
+  status: 'approved' | 'declined',
+  notes?: string,
+  withdrawalAmount?: number,
+  sessionToken?: string,
+): Promise<MigrationRequest> {
+  const payload: any = { status, admin_notes: notes }
+  if (withdrawalAmount !== undefined) {
+    payload.withdrawal_amount = withdrawalAmount
+  }
+
+  const response = await authFetch(
+    `/admin/migration-requests/${requestId}`,
+    {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    },
+    sessionToken,
+  )
+  if (!response.ok) {
+    throw await parseBackendError('Failed to update migration request status', response)
+  }
+  return response.json() as Promise<MigrationRequest>
+}
+
 export async function updateUserStatus(userId: number, status: 'active' | 'disabled', sessionToken?: string): Promise<{ message: string }> {
   const response = await authFetch(`/admin/users/${userId}/status`, {
     method: 'PATCH',

@@ -12,6 +12,7 @@ from app.models.payment_order import PaymentOrder
 from app.models.user import User
 from app.models.support import SupportChat
 from app.models.affiliate import AffiliatePayout
+from app.models.migration_request import MigrationRequest
 
 router = APIRouter(prefix="/admin/finance", tags=["Admin Finance"])
 
@@ -245,6 +246,17 @@ def get_dashboard_stats(
         .where(SupportChat.status == 'open')
     ) or 0
 
+    # Pending migration requests
+    pending_migrations = db.scalar(
+        select(func.count(MigrationRequest.id))
+        .where(MigrationRequest.status == 'pending')
+    ) or 0
+
+    oldest_migration_hours = db.scalar(
+        select(func.extract('epoch', func.now() - func.min(MigrationRequest.created_at)) / 3600)
+        .where(MigrationRequest.status == 'pending')
+    ) or 0
+
     # Challenge Outcomes
     passed_count = db.scalar(
         select(func.count(ChallengeAccount.id))
@@ -319,6 +331,8 @@ def get_dashboard_stats(
             "payoutsOldestHours": int(oldest_ticket_hours),
             "supportTicketsOpen": open_tickets,
             "supportTicketsOldestHours": int(oldest_ticket_hours),
+            "migrationRequestsPending": pending_migrations,
+            "migrationRequestsOldestHours": int(oldest_migration_hours),
             "provisioningFailures": 7,  # Mock for now
             "webhookFailures": 11,  # Mock for now
         },

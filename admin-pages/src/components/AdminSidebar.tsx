@@ -1,6 +1,6 @@
 import './AdminSidebar.css'
 
-type AdminPage = 'analysis' | 'users' | 'accounts' | 'fundedAccounts' | 'breaches' | 'orders' | 'payouts' | 'kycReview' | 'referrals' | 'userProfile' | 'financeAnalysis' | 'coupons' | 'supportTickets' | 'settings' | 'workBoard' | 'mt5' | 'sendAnnouncement'
+type AdminPage = 'analysis' | 'users' | 'accounts' | 'fundedAccounts' | 'breaches' | 'orders' | 'payouts' | 'kycReview' | 'referrals' | 'userProfile' | 'financeAnalysis' | 'coupons' | 'supportTickets' | 'settings' | 'workBoard' | 'mt5' | 'sendAnnouncement' | 'migrationRequests'
 
 interface AdminSidebarProps {
   activePage: AdminPage
@@ -161,6 +161,15 @@ const AdminSidebar = ({ activePage, onNavigate, onLogout, isLoggingOut, allowedP
               onClick={() => onNavigate('supportTickets')}
             >
               Support Tickets
+            </button>
+          )}
+          {hasAccess('migrationRequests') && (
+            <button
+              className={`admin-sidebar-subitem ${activePage === 'migrationRequests' ? 'active' : ''}`}
+              type="button"
+              onClick={() => onNavigate('migrationRequests')}
+            >
+              Migration Requests
             </button>
           )}
           {hasAccess('sendAnnouncement') && (

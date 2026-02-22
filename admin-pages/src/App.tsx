@@ -20,6 +20,7 @@ import SettingsPage from './pages/SettingsPage'
 import WorkBoardPage from './pages/WorkBoardPage'
 import MT5Page from './pages/MT5Page'
 import SendAnnouncementPage from './pages/SendAnnouncementPage'
+import MigrationRequestsPage from './pages/MigrationRequestsPage'
 import {
   adminLoginWithBackend,
   clearPersistedAdminUser,
@@ -32,7 +33,7 @@ import {
 import AdminAuthCard from './components/AdminAuthCard'
 import './App.css'
 
-type AdminPage = 'analysis' | 'users' | 'accounts' | 'fundedAccounts' | 'breaches' | 'orders' | 'payouts' | 'userProfile' | 'kycReview' | 'referrals' | 'financeAnalysis' | 'coupons' | 'supportTickets' | 'settings' | 'workBoard' | 'mt5' | 'sendAnnouncement'
+type AdminPage = 'analysis' | 'users' | 'accounts' | 'fundedAccounts' | 'breaches' | 'orders' | 'payouts' | 'userProfile' | 'kycReview' | 'referrals' | 'financeAnalysis' | 'coupons' | 'supportTickets' | 'settings' | 'workBoard' | 'mt5' | 'sendAnnouncement' | 'migrationRequests'
 
 const DEFAULT_SESSION_REFRESH_INTERVAL_MS = 5 * 60 * 1000
 
@@ -287,6 +288,7 @@ function App() {
           {activePage === 'settings' && <SettingsPage />}
           {activePage === 'kycReview' && <KycReviewPage onOpenProfile={handleOpenUserProfile} />}
           {activePage === 'referrals' && <ReferralsPage />}
+          {activePage === 'migrationRequests' && <MigrationRequestsPage />}
           {activePage === 'userProfile' && selectedUser && (
             <UserProfilePage user={selectedUser} onBack={handleBackToUsers} />
           )}

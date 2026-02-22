@@ -166,6 +166,8 @@ def get_admin_workboard_stats(
                 "update_user_status": 2,
                 "send_email": 1,
                 "add_note": 1,
+                "approve_migration_request": 4,
+                "decline_migration_request": 3,
             }
 
             for activity in activities:

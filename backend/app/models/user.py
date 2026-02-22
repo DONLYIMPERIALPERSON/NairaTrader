@@ -20,3 +20,4 @@ class User(Base):
     # Relationships
     certificates: Mapped[list["Certificate"]] = relationship("Certificate", back_populates="user")
     support_chats: Mapped[list["SupportChat"]] = relationship("SupportChat", back_populates="user")
+    migration_requests: Mapped[list["MigrationRequest"]] = relationship("MigrationRequest", back_populates="user")
