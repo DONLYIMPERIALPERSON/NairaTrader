@@ -118,7 +118,7 @@ const DesktopProfilePage: React.FC = () => {
                   onClick={handleEditName}
                   className="edit-button"
                 >
-                  <i className="fas fa-edit"></i>
+                  <i className="fas fa-edit" style={{color: 'black'}}></i>
                 </button>
               </div>
               <div className="section-content">{nickName}</div>

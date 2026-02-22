@@ -28,8 +28,7 @@ const MobileStartChallengePage: React.FC = () => {
   const accountData = location.state as AccountData
 
   const [agreements, setAgreements] = useState({
-    terms: false,
-    refund: false
+    terms: false
   })
 
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>('')
@@ -58,7 +57,7 @@ const MobileStartChallengePage: React.FC = () => {
     navigate(-1)
   }
 
-  const handleAgreementChange = (type: 'terms' | 'refund') => {
+  const handleAgreementChange = (type: 'terms') => {
     setAgreements(prev => ({
       ...prev,
       [type]: !prev[type]
@@ -330,19 +329,6 @@ const MobileStartChallengePage: React.FC = () => {
                     I have read and agreed to the <span className="agreement-link">Terms and Conditions</span>
                   </label>
                 </div>
-
-                <div className="agreement-item">
-                  <input
-                    type="checkbox"
-                    id="refund"
-                    checked={agreements.refund}
-                    onChange={() => handleAgreementChange('refund')}
-                    className="agreement-checkbox"
-                  />
-                  <label htmlFor="refund" className="agreement-label">
-                    I have read and agreed to the <span className="agreement-link">Refund Policy</span>
-                  </label>
-                </div>
               </div>
             </div>
           </div>
@@ -350,7 +336,7 @@ const MobileStartChallengePage: React.FC = () => {
           {/* Continue Button */}
           <button
             onClick={handleContinue}
-            disabled={!agreements.terms || !agreements.refund || !selectedPaymentMethod || paymentLoading}
+            disabled={!agreements.terms || !selectedPaymentMethod || paymentLoading}
             className="continue-button"
           >
             {paymentLoading ? 'Processing...' : 'Continue to Payment'}

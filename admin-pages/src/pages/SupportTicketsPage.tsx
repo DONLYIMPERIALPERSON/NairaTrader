@@ -1,87 +1,60 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { AdminUser } from './UsersPage'
-
-type Ticket = {
-  id: string
-  user: string
-  subject: string
-  priority: 'Low' | 'Medium' | 'High'
-  createdAt: string
-  assignedTo?: string
-  answered: boolean
-  unreadCount: number
-  closed: boolean
-  messages: Array<{
-    id: string
-    sender: 'User' | 'Support'
-    text: string
-    time: string
-  }>
-}
-
-const initialTickets: Ticket[] = [
-  {
-    id: 'TK-1001', user: 'Favour M.', subject: 'KYC upload not working', priority: 'High', createdAt: '2026-02-17T10:00:00', answered: false, unreadCount: 0, closed: false,
-    messages: [
-      { id: 'm1', sender: 'User', text: 'I cannot upload my ID card on KYC page.', time: '2026-02-17 10:01' },
-    ],
-  },
-  {
-    id: 'TK-1002', user: 'Chinedu A.', subject: 'Challenge reset request', priority: 'Medium', createdAt: '2026-02-17T13:25:00', answered: false, unreadCount: 0, closed: false,
-    messages: [
-      { id: 'm1', sender: 'User', text: 'Please I need a reset for account CH-93220.', time: '2026-02-17 13:27' },
-    ],
-  },
-  {
-    id: 'TK-1003', user: 'Grace O.', subject: 'Payout delay question', priority: 'High', createdAt: '2026-02-16T21:40:00', assignedTo: 'Agent Tolu', answered: false, unreadCount: 3, closed: false,
-    messages: [
-      { id: 'm1', sender: 'User', text: 'My payout is still pending after 3 days.', time: '2026-02-16 21:42' },
-      { id: 'm2', sender: 'Support', text: 'Thanks, we are checking with finance team.', time: '2026-02-16 22:10' },
-      { id: 'm3', sender: 'User', text: 'Any update yet?', time: '2026-02-17 09:05' },
-    ],
-  },
-  {
-    id: 'TK-1004', user: 'Kelvin D.', subject: 'Coupon not applying', priority: 'Low', createdAt: '2026-02-16T09:10:00', assignedTo: 'Agent Chioma', answered: true, unreadCount: 0, closed: false,
-    messages: [
-      { id: 'm1', sender: 'User', text: 'Coupon WELCOME10 says invalid.', time: '2026-02-16 09:11' },
-      { id: 'm2', sender: 'Support', text: 'Please try again now, it has been fixed.', time: '2026-02-16 09:23' },
-    ],
-  },
-  {
-    id: 'TK-1005', user: 'Ngozi R.', subject: 'MT5 login issue', priority: 'High', createdAt: '2026-02-17T08:45:00', assignedTo: 'Agent Tolu', answered: false, unreadCount: 5, closed: false,
-    messages: [
-      { id: 'm1', sender: 'User', text: 'I cannot log in to MT5 with sent credentials.', time: '2026-02-17 08:46' },
-      { id: 'm2', sender: 'Support', text: 'Kindly confirm your server and account number.', time: '2026-02-17 08:55' },
-      { id: 'm3', sender: 'User', text: 'Server is MT5-Live-01 and account 10314521.', time: '2026-02-17 09:00' },
-    ],
-  },
-  {
-    id: 'TK-1006', user: 'Amina Y.', subject: 'Wrong account balance', priority: 'Medium', createdAt: '2026-02-17T07:05:00', answered: false, unreadCount: 0, closed: false,
-    messages: [
-      { id: 'm1', sender: 'User', text: 'My dashboard shows wrong balance after trade.', time: '2026-02-17 07:08' },
-    ],
-  },
-]
+import {
+  fetchSupportTickets,
+  fetchSupportChat,
+  assignSupportChat,
+  sendSupportMessage,
+  closeSupportChat,
+  markSupportChatAsRead,
+  type SupportTicket,
+  type SupportChat,
+  type SupportMessage,
+  getPersistedAdminUser
+} from '../lib/adminAuth'
 
 interface SupportTicketsPageProps {
   onOpenProfile: (user: AdminUser) => void
 }
 
 const SupportTicketsPage = ({ onOpenProfile }: SupportTicketsPageProps) => {
-  const [tickets, setTickets] = useState<Ticket[]>(initialTickets)
+  const [tickets, setTickets] = useState<SupportTicket[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [now, setNow] = useState(Date.now())
-  const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null)
+  const [selectedChat, setSelectedChat] = useState<SupportChat | null>(null)
   const [newMessage, setNewMessage] = useState('')
+  const [sending, setSending] = useState(false)
+  const [activeTab, setActiveTab] = useState<'active' | 'history'>('active')
+
+  const adminUser = getPersistedAdminUser()
+  const adminName = adminUser?.full_name || adminUser?.nick_name || 'Admin'
 
   useEffect(() => {
+    loadTickets()
     const timer = setInterval(() => setNow(Date.now()), 1000)
     return () => clearInterval(timer)
-  }, [])
+  }, [activeTab])
 
-  const unassignedTickets = useMemo(() => tickets.filter((ticket) => !ticket.assignedTo), [tickets])
-  const assignedTickets = useMemo(() => tickets.filter((ticket) => Boolean(ticket.assignedTo)), [tickets])
-  const unansweredTickets = useMemo(() => tickets.filter((ticket) => !ticket.answered && !ticket.assignedTo), [tickets])
-  const selectedTicket = useMemo(() => tickets.find((ticket) => ticket.id === selectedTicketId) ?? null, [tickets, selectedTicketId])
+  const loadTickets = async () => {
+    try {
+      setLoading(true)
+      setError(null)
+      const status = activeTab === 'history' ? 'closed' : 'open'
+      const tickets = await fetchSupportTickets(status)
+      console.log('Loaded tickets:', tickets)
+      setTickets(tickets)
+    } catch (err) {
+      console.error('Error loading tickets:', err)
+      setError(err instanceof Error ? err.message : 'Failed to load tickets')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const unassignedTickets = useMemo(() => tickets.filter((ticket) => !ticket.assigned_to), [tickets])
+  const assignedTickets = useMemo(() => tickets.filter((ticket) => Boolean(ticket.assigned_to)), [tickets])
+  const unansweredTickets = useMemo(() => tickets.filter((ticket) => ticket.user_unread_count > 0 && !ticket.assigned_to), [tickets])
 
   const formatCountdown = (createdAt: string) => {
     const expiresAt = new Date(createdAt).getTime() + 24 * 60 * 60 * 1000
@@ -99,45 +72,64 @@ const SupportTicketsPage = ({ onOpenProfile }: SupportTicketsPageProps) => {
       .padStart(2, '0')}`
   }
 
-  const handleSendMessage = () => {
-    if (!selectedTicket || !newMessage.trim()) return
+  const handleTicketClick = async (ticket: SupportTicket) => {
+    try {
+      const chat = await fetchSupportChat(ticket.id)
+      setSelectedChat(chat)
 
-    setTickets((prev) =>
-      prev.map((ticket) =>
-        ticket.id === selectedTicket.id
-          ? {
-              ...ticket,
-              answered: true,
-              assignedTo: ticket.assignedTo ?? 'Agent Admin',
-              unreadCount: 0,
-              messages: [
-                ...ticket.messages,
-                {
-                  id: `m${ticket.messages.length + 1}`,
-                  sender: 'Support',
-                  text: newMessage.trim(),
-                  time: new Date().toISOString().slice(0, 16).replace('T', ' '),
-                },
-              ],
-            }
-          : ticket,
-      ),
-    )
-
-    setNewMessage('')
+      // Mark user messages as read
+      if (ticket.user_unread_count > 0) {
+        await markSupportChatAsRead(ticket.id)
+        // Refresh tickets to update counts
+        loadTickets()
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load chat')
+    }
   }
 
-  const handleCloseTicket = () => {
-    if (!selectedTicket) return
+  const handleSendMessage = async () => {
+    if (!selectedChat || !newMessage.trim() || sending) return
 
-    setTickets((prev) => prev.map((ticket) => (ticket.id === selectedTicket.id ? { ...ticket, closed: true } : ticket)))
-    setSelectedTicketId(null)
+    try {
+      setSending(true)
+
+      // Assign chat to admin if not already assigned
+      if (!selectedChat.assigned_to) {
+        await assignSupportChat(selectedChat.id, adminName)
+      }
+
+      // Send message
+      await sendSupportMessage(selectedChat.id, newMessage.trim(), adminName)
+
+      // Refresh chat and tickets
+      const updatedChat = await fetchSupportChat(selectedChat.id)
+      setSelectedChat(updatedChat)
+      loadTickets()
+      setNewMessage('')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to send message')
+    } finally {
+      setSending(false)
+    }
   }
 
-  const openProfile = (ticket: Ticket) => {
+  const handleCloseTicket = async () => {
+    if (!selectedChat) return
+
+    try {
+      await closeSupportChat(selectedChat.id)
+      setSelectedChat(null)
+      loadTickets()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to close ticket')
+    }
+  }
+
+  const openProfile = (ticket: SupportTicket) => {
     onOpenProfile({
-      name: ticket.user,
-      email: `${ticket.user.toLowerCase().replace(/\s+/g, '.').replace(/[^a-z.]/g, '')}@mail.com`,
+      name: ticket.user_name,
+      email: ticket.user_email,
       accounts: '1 / 0',
       revenue: '₦0',
       orders: '1',
@@ -145,11 +137,65 @@ const SupportTicketsPage = ({ onOpenProfile }: SupportTicketsPageProps) => {
     })
   }
 
+  if (loading) {
+    return (
+      <section className="admin-page-stack">
+        <div className="admin-dashboard-card">
+          <h2>Support Tickets</h2>
+          <p>Loading tickets...</p>
+        </div>
+      </section>
+    )
+  }
+
+  if (error) {
+    return (
+      <section className="admin-page-stack">
+        <div className="admin-dashboard-card">
+          <h2>Support Tickets</h2>
+          <p style={{ color: '#ef4444' }}>Error: {error}</p>
+          <button onClick={loadTickets}>Retry</button>
+        </div>
+      </section>
+    )
+  }
+
   return (
     <section className="admin-page-stack">
       <div className="admin-dashboard-card">
         <h2>Support Tickets</h2>
         <p>Manage unassigned and assigned tickets, and track unanswered tickets with SLA countdown.</p>
+
+        <div style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
+          <button
+            onClick={() => setActiveTab('active')}
+            style={{
+              padding: '8px 16px',
+              borderRadius: '6px',
+              border: activeTab === 'active' ? '1px solid #f59e0b' : '1px solid #374151',
+              background: activeTab === 'active' ? '#f59e0b' : '#111827',
+              color: activeTab === 'active' ? '#111827' : '#fff',
+              cursor: 'pointer',
+              fontWeight: activeTab === 'active' ? 'bold' : 'normal',
+            }}
+          >
+            Active Tickets
+          </button>
+          <button
+            onClick={() => setActiveTab('history')}
+            style={{
+              padding: '8px 16px',
+              borderRadius: '6px',
+              border: activeTab === 'history' ? '1px solid #f59e0b' : '1px solid #374151',
+              background: activeTab === 'history' ? '#f59e0b' : '#111827',
+              color: activeTab === 'history' ? '#111827' : '#fff',
+              cursor: 'pointer',
+              fontWeight: activeTab === 'history' ? 'bold' : 'normal',
+            }}
+          >
+            History
+          </button>
+        </div>
       </div>
 
       <div className="admin-kpi-grid">
@@ -184,15 +230,15 @@ const SupportTicketsPage = ({ onOpenProfile }: SupportTicketsPageProps) => {
           </thead>
           <tbody>
             {assignedTickets.map((ticket) => (
-              <tr key={ticket.id} onClick={() => setSelectedTicketId(ticket.id)} style={{ cursor: 'pointer', opacity: ticket.closed ? 0.6 : 1 }}>
+              <tr key={ticket.id} onClick={() => handleTicketClick(ticket)} style={{ cursor: 'pointer', opacity: ticket.status === 'closed' ? 0.6 : 1 }}>
                 <td>{ticket.id}</td>
-                <td>{ticket.user}</td>
+                <td>{ticket.user_name}</td>
                 <td>{ticket.subject}</td>
-                <td>{ticket.priority}</td>
-                <td>{ticket.createdAt.replace('T', ' ')}</td>
-                <td>{ticket.assignedTo ?? '—'}</td>
+                <td style={{ textTransform: 'capitalize' }}>{ticket.priority}</td>
+                <td>{new Date(ticket.created_at).toLocaleString()}</td>
+                <td>{ticket.assigned_to ?? '—'}</td>
                 <td>
-                  {ticket.unreadCount > 0 ? (
+                  {ticket.user_unread_count > 0 ? (
                     <span
                       style={{
                         display: 'inline-flex',
@@ -208,7 +254,7 @@ const SupportTicketsPage = ({ onOpenProfile }: SupportTicketsPageProps) => {
                         fontWeight: 700,
                       }}
                     >
-                      {ticket.unreadCount}
+                      {ticket.user_unread_count}
                     </span>
                   ) : (
                     '0'
@@ -221,32 +267,34 @@ const SupportTicketsPage = ({ onOpenProfile }: SupportTicketsPageProps) => {
       </div>
 
       <div className="admin-table-card">
-        <h3 style={{ color: '#fff' }}>Unanswered Tickets</h3>
+        <h3 style={{ color: '#fff' }}>Unassigned Tickets</h3>
         <table className="admin-table">
           <thead>
             <tr>
               <th>Ticket ID</th>
               <th>User</th>
               <th>Subject</th>
+              <th>Priority</th>
               <th>Created At</th>
               <th>Time Left</th>
             </tr>
           </thead>
           <tbody>
-            {unansweredTickets.map((ticket) => (
-              <tr key={ticket.id} onClick={() => setSelectedTicketId(ticket.id)} style={{ cursor: 'pointer' }}>
+            {unassignedTickets.map((ticket) => (
+              <tr key={ticket.id} onClick={() => handleTicketClick(ticket)} style={{ cursor: 'pointer' }}>
                 <td>{ticket.id}</td>
-                <td>{ticket.user}</td>
+                <td>{ticket.user_name}</td>
                 <td>{ticket.subject}</td>
-                <td>{ticket.createdAt.replace('T', ' ')}</td>
-                <td>{formatCountdown(ticket.createdAt)}</td>
+                <td style={{ textTransform: 'capitalize' }}>{ticket.priority}</td>
+                <td>{new Date(ticket.created_at).toLocaleString()}</td>
+                <td>{formatCountdown(ticket.created_at)}</td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
 
-      {selectedTicket && (
+      {selectedChat && (
         <div
           style={{
             position: 'fixed',
@@ -258,7 +306,7 @@ const SupportTicketsPage = ({ onOpenProfile }: SupportTicketsPageProps) => {
             zIndex: 2000,
             padding: '16px',
           }}
-          onClick={() => setSelectedTicketId(null)}
+          onClick={() => setSelectedChat(null)}
         >
           <div
             style={{
@@ -274,37 +322,52 @@ const SupportTicketsPage = ({ onOpenProfile }: SupportTicketsPageProps) => {
             onClick={(event) => event.stopPropagation()}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-              <h3 style={{ margin: 0 }}>{selectedTicket.id} — {selectedTicket.subject}</h3>
-              <button type="button" onClick={() => setSelectedTicketId(null)}>Close</button>
+              <h3 style={{ margin: 0 }}>{selectedChat.id} — {selectedChat.subject}</h3>
+              <button type="button" onClick={() => setSelectedChat(null)}>Close</button>
             </div>
 
             <p style={{ marginTop: 0, color: '#cbd5e1' }}>
-              User: {selectedTicket.user} • Assigned to: {selectedTicket.assignedTo ?? '—'}
+              User: {selectedChat.user_id} • Assigned to: {selectedChat.assigned_to ?? '—'}
             </p>
 
-            {!selectedTicket.assignedTo && (
+            {!selectedChat.assigned_to && (
               <p style={{ marginTop: 0, color: '#fbbf24' }}>
                 Reply to this first message to move ticket into Assigned Tickets.
               </p>
             )}
 
             <div style={{ display: 'grid', gap: '8px', marginBottom: '14px' }}>
-              {selectedTicket.messages.map((message) => (
+              {selectedChat.messages.map((message: SupportMessage) => (
                 <div
                   key={message.id}
                   style={{
-                    alignSelf: message.sender === 'Support' ? 'flex-end' : 'flex-start',
-                    background: message.sender === 'Support' ? '#f59e0b' : '#1f2937',
-                    color: message.sender === 'Support' ? '#111827' : '#fff',
+                    alignSelf: message.sender === 'support' ? 'flex-end' : 'flex-start',
+                    background: message.sender === 'support' ? '#f59e0b' : '#1f2937',
+                    color: message.sender === 'support' ? '#111827' : '#fff',
                     border: '1px solid #374151',
                     borderRadius: '10px',
                     padding: '10px 12px',
                     maxWidth: '80%',
                   }}
                 >
-                  <strong style={{ fontSize: '12px' }}>{message.sender}</strong>
-                  <p style={{ margin: '6px 0' }}>{message.text}</p>
-                  <small style={{ opacity: 0.8 }}>{message.time}</small>
+                  <strong style={{ fontSize: '12px', textTransform: 'capitalize' }}>{message.sender}</strong>
+                  {message.message && <p style={{ margin: '6px 0' }}>{message.message}</p>}
+                  {message.image_url && (
+                    <div style={{ margin: '6px 0' }}>
+                      <img
+                        src={message.image_url}
+                        alt="Uploaded image"
+                        style={{
+                          maxWidth: '100%',
+                          maxHeight: '200px',
+                          borderRadius: '8px',
+                          cursor: 'pointer'
+                        }}
+                        onClick={() => message.image_url && window.open(message.image_url, '_blank')}
+                      />
+                    </div>
+                  )}
+                  <small style={{ opacity: 0.8 }}>{new Date(message.created_at).toLocaleString()}</small>
                 </div>
               ))}
             </div>
@@ -315,12 +378,18 @@ const SupportTicketsPage = ({ onOpenProfile }: SupportTicketsPageProps) => {
                 onChange={(event) => setNewMessage(event.target.value)}
                 placeholder="Type a support reply..."
                 style={{ flex: 1, padding: '10px', borderRadius: '8px', border: '1px solid #374151', background: '#111827', color: '#fff' }}
+                disabled={sending}
               />
-              <button type="button" onClick={handleSendMessage}>Send Message</button>
+              <button type="button" onClick={handleSendMessage} disabled={sending || !newMessage.trim()}>
+                {sending ? 'Sending...' : 'Send Message'}
+              </button>
             </div>
 
             <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-              <button type="button" onClick={() => openProfile(selectedTicket)}>View User Profile</button>
+              <button type="button" onClick={() => {
+                const ticket = tickets.find(t => t.id === selectedChat.id)
+                if (ticket) openProfile(ticket)
+              }}>View User Profile</button>
               <button type="button" onClick={handleCloseTicket}>Close Ticket</button>
             </div>
           </div>

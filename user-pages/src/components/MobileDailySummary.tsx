@@ -1,7 +1,51 @@
 import React from 'react'
 import '../styles/MobileDailySummary.css'
 
-const MobileDailySummary: React.FC = () => {
+interface MobileDailySummaryProps {
+  todayClosedPnl: number
+  todayTradesCount: number
+  todayLotsTotal: number
+}
+
+const MobileDailySummary: React.FC<MobileDailySummaryProps> = ({
+  todayClosedPnl,
+  todayTradesCount,
+  todayLotsTotal
+}) => {
+  const formatCurrency = (amount: number) => {
+    const sign = amount >= 0 ? '+' : ''
+    return `${sign}$${Math.abs(amount).toFixed(2)}`
+  }
+
+  const getResultBadge = (pnl: number) => {
+    if (pnl > 0) {
+      return (
+        <span className="profit-badge">
+          <i className="fas fa-plus-circle icon-result"></i> {formatCurrency(pnl)}
+        </span>
+      )
+    } else if (pnl < 0) {
+      return (
+        <span className="loss-badge">
+          <i className="fas fa-minus-circle icon-result"></i> {formatCurrency(pnl)}
+        </span>
+      )
+    } else {
+      return (
+        <span className="neutral-badge">
+          <i className="fas fa-minus"></i> $0.00
+        </span>
+      )
+    }
+  }
+
+  const today = new Date()
+  const formattedDate = today.toLocaleDateString('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric'
+  })
+
   return (
     <div className="section">
       <div className="daily-summary-title">
@@ -18,33 +62,15 @@ const MobileDailySummary: React.FC = () => {
 
       <div className="summary-list">
         <div className="summary-row">
-          <span className="row-date">Mon 10 Feb</span>
-          <span className="row-trades">3</span>
-          <span className="row-lots">0.45</span>
-          <span className="row-result"><span className="profit-badge"><i className="fas fa-plus-circle icon-result"></i> +$240</span></span>
-        </div>
-        <div className="summary-row">
-          <span className="row-date">Tue 11 Feb</span>
-          <span className="row-trades">5</span>
-          <span className="row-lots">0.92</span>
-          <span className="row-result"><span className="loss-badge"><i className="fas fa-minus-circle icon-result"></i> -$127</span></span>
-        </div>
-        <div className="summary-row">
-          <span className="row-date">Wed 12 Feb</span>
-          <span className="row-trades">2</span>
-          <span className="row-lots">0.30</span>
-          <span className="row-result"><span className="profit-badge"><i className="fas fa-plus-circle"></i> +$89</span></span>
-        </div>
-        <div className="summary-row">
-          <span className="row-date">Thu 13 Feb</span>
-          <span className="row-trades">4</span>
-          <span className="row-lots">0.78</span>
-          <span className="row-result"><span className="neutral-badge"><i className="fas fa-minus"></i> $0.00</span></span>
+          <span className="row-date">{formattedDate}</span>
+          <span className="row-trades">{todayTradesCount}</span>
+          <span className="row-lots">{todayLotsTotal.toFixed(2)}</span>
+          <span className="row-result">{getResultBadge(todayClosedPnl)}</span>
         </div>
       </div>
 
       <div style={{marginTop: '18px', display: 'flex', justifyContent: 'flex-end'}}>
-        <span style={{fontSize: '12px', color: 'rgba(255,215,0,0.7)'}}><i className="fas fa-regular fa-circle"></i> last 4 trading days</span>
+        <span style={{fontSize: '12px', color: 'rgba(255,215,0,0.7)'}}><i className="fas fa-regular fa-circle"></i> today's trading activity</span>
       </div>
     </div>
   )

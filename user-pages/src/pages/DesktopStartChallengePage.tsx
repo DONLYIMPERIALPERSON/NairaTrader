@@ -30,7 +30,7 @@ const DesktopStartChallengePage: React.FC = () => {
   const location = useLocation()
   const accountData = location.state as AccountData | undefined
 
-  const [agreements, setAgreements] = useState({ terms: false, refund: false })
+  const [agreements, setAgreements] = useState({ terms: false })
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>('')
   const [promoCode, setPromoCode] = useState('')
   const [couponLoading, setCouponLoading] = useState(false)
@@ -55,12 +55,12 @@ const DesktopStartChallengePage: React.FC = () => {
     return ''
   }
 
-  const handleAgreementChange = (type: 'terms' | 'refund') => {
+  const handleAgreementChange = (type: 'terms') => {
     setAgreements(prev => ({ ...prev, [type]: !prev[type] }))
   }
 
   const handleContinue = () => {
-    if (!selectedPaymentMethod || !agreements.terms || !agreements.refund || !accountData) return
+    if (!selectedPaymentMethod || !agreements.terms || !accountData) return
     if (selectedPaymentMethod !== 'bank-transfer') return
 
     const planId = inferPlanId(accountData)
@@ -179,21 +179,15 @@ const DesktopStartChallengePage: React.FC = () => {
           </div>
         ) : (
           <>
-            <div className="desktop-checkout-hero-panel">
-              <div className="desktop-checkout-hero-content">
-                <h2>Start Challenge</h2>
-                <p>Show us your trading skills. Pass the Evaluation Process and receive a funded Account.</p>
-                <span>If you sabi Trade, We Sabi Pay</span>
-              </div>
-              <div className="desktop-checkout-hero-stats">
-                <div className="desktop-summary-row"><span>Account Balance</span><strong>{accountData.size}</strong></div>
-                <div className="desktop-summary-row"><span>Trading Account Currency</span><strong>Naira</strong></div>
-                <div className="desktop-summary-row"><span>Platform</span><strong>MetaTrader 5</strong></div>
-              </div>
-            </div>
-
             <div className="desktop-checkout-grid">
               <div className="desktop-checkout-column">
+                <div className="desktop-checkout-panel">
+                  <h3>Account Details</h3>
+                  <div className="desktop-summary-row"><span>Account Balance</span><strong>{accountData.size}</strong></div>
+                  <div className="desktop-summary-row"><span>Trading Account Currency</span><strong>Naira</strong></div>
+                  <div className="desktop-summary-row"><span>Platform</span><strong>MetaTrader 5</strong></div>
+                </div>
+
                 <div className="desktop-checkout-panel">
                   <h3>Promo Code</h3>
                   <div className="desktop-promo-row">
@@ -220,10 +214,6 @@ const DesktopStartChallengePage: React.FC = () => {
                     <input type="checkbox" checked={agreements.terms} onChange={() => handleAgreementChange('terms')} />
                     I agree to the Terms and Conditions
                   </label>
-                  <label className="desktop-check-row">
-                    <input type="checkbox" checked={agreements.refund} onChange={() => handleAgreementChange('refund')} />
-                    I agree to the Refund Policy
-                  </label>
                 </div>
               </div>
 
@@ -240,9 +230,9 @@ const DesktopStartChallengePage: React.FC = () => {
                       <div className="desktop-summary-row"><span>Discount ({couponPreview.code})</span><strong>-{couponPreview.formatted_discount_amount}</strong></div>
                     </>
                   )}
-                  <div className="desktop-summary-row desktop-summary-total"><span>Total</span><strong>{couponPreview?.formatted_final_amount ?? accountData.fee}</strong></div>
+                  <div className="desktop-summary-row desktop-summary-total" style={{color: 'black'}}><span>Total</span><strong style={{color: 'black'}}>{couponPreview?.formatted_final_amount ?? accountData.fee}</strong></div>
 
-                  <h4 className="desktop-payment-title">Select Payment Method</h4>
+                  <h4 className="desktop-payment-title" style={{color: 'black'}}>Select Payment Method</h4>
                   <label className="desktop-radio-row">
                     <input
                       type="radio"
@@ -266,14 +256,14 @@ const DesktopStartChallengePage: React.FC = () => {
                     />
                     <span className="desktop-method-pill">
                       <i className="fas fa-credit-card" aria-hidden="true"></i>
-                      <span>ATM Cards &amp; USSD</span>
+                      <span>ATM Cards & USSD</span>
                     </span>
                   </label>
 
                   <button
                     className="desktop-checkout-continue"
                     onClick={handleContinue}
-                    disabled={!selectedPaymentMethod || !agreements.terms || !agreements.refund || paymentLoading}
+                    disabled={!selectedPaymentMethod || !agreements.terms || paymentLoading}
                   >
                     {paymentLoading ? 'Processing...' : 'Continue to Payment'}
                   </button>

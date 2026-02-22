@@ -7,7 +7,7 @@ export default function Rules() {
             <div className="w-full px-4 md:px-6 lg:px-8">
                 <Title
                     title="Rules"
-                    heading="The only Prop Firm with just 2 simple rules."
+                    heading="Simple Rules Tailourd for your consistent payouts and long term trading success"
                     description="We’ve removed 98% of all traditional prop firm rules to make trading at NairaTrader as simple and fair as possible."
                 />
 
@@ -23,7 +23,7 @@ export default function Rules() {
                     </div>
 
                     <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-md p-5 md:p-7">
-                        <h3 className="text-xl font-semibold mb-4">Rules & Targets</h3>
+                        <h3 className="text-xl font-semibold mb-4">Evaluation Rules</h3>
                         <p className="text-sm text-yellow-300 mb-4">
                             These rules and targets apply to both <strong>Phase 1</strong> and <strong>Phase 2</strong>.
                         </p>
@@ -40,35 +40,16 @@ export default function Rules() {
                         </div>
 
                         <ul className="space-y-2 text-gray-200">
-                            <li className="flex items-start gap-2"><CircleDot className="w-4 h-4 mt-0.5 text-yellow-300" /> No 1 – 4 minute scalping.</li>
-                            <li className="flex items-start gap-2"><CircleDot className="w-4 h-4 mt-0.5 text-yellow-300" /> Trade at least once every 7 days to keep your account active.</li>
-                            <li className="flex items-start gap-2"><CircleDot className="w-4 h-4 mt-0.5 text-yellow-300" /> All traders are expected to follow these rules strictly to move to phase 2 stage.</li>
+                            <li className="flex items-start gap-2"><CircleDot className="w-4 h-4 mt-0.5 text-yellow-300" /> All traders are expected to follow these rules to move to funded stage.</li>
                         </ul>
                     </div>
 
-                    <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-md p-5 md:p-7">
-                        <h3 className="text-xl font-semibold mb-3">KYC Verification & Withdrawal Rule</h3>
-                        <p className="text-gray-200 leading-relaxed">
-                            Once a trader achieves a 10% profit on their funded account, they must complete KYC verification before making any withdrawal.
-                        </p>
 
-                        <div className="mt-4 space-y-2 text-gray-200">
-                            <p className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 mt-0.5 text-green-300" /> When you hit 10% profit, you can request KYC verification.</p>
-                            <p className="flex items-start gap-2"><BadgeCheck className="w-4 h-4 mt-0.5 text-green-300" /> After passing KYC, you are free to withdraw anytime.</p>
-                            <p className="flex items-start gap-2"><ShieldCheck className="w-4 h-4 mt-0.5 text-green-300" /> You may continue trading after KYC to grow your profits further.</p>
-                            <p className="flex items-start gap-2"><AlertTriangle className="w-4 h-4 mt-0.5 text-red-300" /> If you exceed 10% profit without doing KYC, any profit beyond that point will be removed — you’ll only keep the first 10% until you verify.</p>
-                            <p className="text-yellow-300">Make 10%, do KYC, then you’re free to withdraw or keep trading unlimited.</p>
-                        </div>
-
-                        <p className="text-sm text-gray-400 mt-4">
-                            KYC ensures secure payouts and confirms your trader identity under NairaTrader’s compliance policy.
-                        </p>
-                    </div>
 
                     <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-md p-5 md:p-7">
-                        <h3 className="text-xl font-semibold mb-3">Payout Policy</h3>
+                        <h3 className="text-xl font-semibold mb-3">Funded and Payout</h3>
                         <p className="text-gray-200 mb-4">
-                            We process all trader payouts within 24 hours, paid directly to your bank account.
+                            We process all trader payouts within minutes, paid directly to your bank account.
                         </p>
 
                         <div className="overflow-x-auto">
@@ -83,18 +64,18 @@ export default function Rules() {
                                 <tbody className="text-gray-200">
                                     <tr className="border-b border-white/10">
                                         <td className="py-3 pr-4">Minimum Payout</td>
-                                        <td className="py-3 pr-4">10%</td>
-                                        <td className="py-3 pr-4">You can request a payout after 10% profit.</td>
+                                        <td className="py-3 pr-4">1%</td>
+                                        <td className="py-3 pr-4">You can request a payout after 1% profit.</td>
                                     </tr>
                                     <tr className="border-b border-white/10">
                                         <td className="py-3 pr-4">Maximum Payout</td>
-                                        <td className="py-3 pr-4">50/100%</td>
-                                        <td className="py-3 pr-4">50% for 1.5m & 3m accounts and 100% for other accounts. Profits above these limits will be removed.</td>
+                                        <td className="py-3 pr-4">50%</td>
+                                        <td className="py-3 pr-4">50% profit cap. Profits above these limits will be removed.</td>
                                     </tr>
                                     <tr>
                                         <td className="py-3 pr-4">Profit Split</td>
-                                        <td className="py-3 pr-4">70%</td>
-                                        <td className="py-3 pr-4">Traders keep 70% of their profit; NairaTrader takes 30%.</td>
+                                        <td className="py-3 pr-4">80%</td>
+                                        <td className="py-3 pr-4">Traders keep 80% of their profit; NairaTrader takes 20%.</td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -104,7 +85,7 @@ export default function Rules() {
                     </div>
 
                     <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-md p-5 md:p-7">
-                        <h3 className="text-xl font-semibold mb-3">Scalping Policy</h3>
+                        <h3 className="text-xl font-semibold mb-3">Scalping Rule</h3>
                         <p className="text-gray-200 leading-relaxed">
                             No 1 – 4 minutes scalping. Scalping up to 3 minutes 59 seconds is still counted as a violation, so we recommend holding your trade for at least 4 minutes.
                         </p>
@@ -114,7 +95,7 @@ export default function Rules() {
                     </div>
 
                     <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-md p-5 md:p-7">
-                        <h3 className="text-xl font-semibold mb-3">Account Inactivity Policy</h3>
+                        <h3 className="text-xl font-semibold mb-3">Account Inactivity</h3>
                         <p className="text-gray-200">Our broker automatically deletes inactive accounts after 5 days of no trading activity.</p>
                         <p className="text-gray-200 mt-3 flex items-start gap-2"><CircleDot className="w-4 h-4 mt-0.5 text-yellow-300" /> Stay active! Place at least one trade every 5 days.</p>
                         <p className="text-gray-300 mt-2">
@@ -123,11 +104,11 @@ export default function Rules() {
                     </div>
 
                     <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-md p-5 md:p-7">
-                        <h3 className="text-xl font-semibold mb-3">Example: ₦200,000 Account</h3>
+                        <h3 className="text-xl font-semibold mb-3">Drawdown Explained</h3>
                         <p className="text-gray-200 leading-relaxed">
                             At NairaTrader, your maximum loss is 20% of your account size which remains static at every new balance peak of your account.
                         </p>
-                        <p className="text-gray-200 mt-2">You start with a ₦200,000 funded account.</p>
+                        <p className="text-gray-200 mt-2">Example: On a ₦200,000 funded account.</p>
                         <p className="text-yellow-300 mt-2">Maximum drawdown: 20% of ₦200,000 = ₦40,000</p>
 
                         <div className="overflow-x-auto mt-4">
@@ -169,7 +150,7 @@ export default function Rules() {
                             </table>
                         </div>
 
-                        <p className="mt-4 text-gray-200 flex items-start gap-2"><CheckCircle2 className="w-4 h-4 mt-0.5 text-green-300" /> Quick Cash Out: If your account is in overall profit, you may close your trades even at 19.9% DD and request a cash-out before reaching the 20% maximum drawdown limit.</p>
+                        <p className="mt-4 text-gray-200 flex items-start gap-2"><CheckCircle2 className="w-4 h-4 mt-0.5 text-green-300" /> Quick Cash-Out: If your account is still in profit, you can close your trades and request a cash-out at 19.9% drawdown (before hitting the 20% limit).</p>
                         <p className="mt-3 text-gray-200 flex items-start gap-2"><AlertTriangle className="w-4 h-4 mt-0.5 text-red-300" /> Key Takeaway: You should never lose more than 20% of your original account size at any point regardless of your account profit.</p>
                     </div>
 

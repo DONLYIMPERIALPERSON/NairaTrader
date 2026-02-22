@@ -79,10 +79,18 @@ const MobileAccountDetailsPage: React.FC = () => {
         return (
           <>
             <div className="mobile-account-details-card">
-              <MobileStatsPerformance />
+              <MobileStatsPerformance
+                winRate={accountData.metrics.win_rate}
+                closedTradesCount={accountData.metrics.closed_trades_count}
+                winningTradesCount={accountData.metrics.winning_trades_count}
+              />
             </div>
             <div className="mobile-account-details-card mobile-account-details-card-spaced">
-              <MobileDailySummary />
+              <MobileDailySummary
+                todayClosedPnl={accountData.metrics.today_closed_pnl}
+                todayTradesCount={accountData.metrics.today_trades_count}
+                todayLotsTotal={accountData.metrics.today_lots_total}
+              />
             </div>
           </>
         )
@@ -95,7 +103,6 @@ const MobileAccountDetailsPage: React.FC = () => {
                   server={accountData.credentials.server}
                   accountNumber={accountData.credentials.account_number}
                   password={accountData.credentials.password}
-                  investorPassword={accountData.credentials.investor_password}
                 />
               </div>
             )}

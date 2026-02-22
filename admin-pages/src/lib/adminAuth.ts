@@ -735,3 +735,117 @@ export function getPersistedAdminUser(): AdminAuthMeResponse | null {
 export function clearPersistedAdminUser(): void {
   localStorage.removeItem('nairatrader_admin_auth_user')
 }
+
+export type SupportTicket = {
+  id: string
+  subject: string
+  status: 'open' | 'closed'
+  priority: 'low' | 'medium' | 'high'
+  assigned_to: string | null
+  user_name: string
+  user_email: string
+  created_at: string
+  updated_at: string
+  last_message: string
+  unread_count: number
+  user_unread_count: number
+}
+
+export type SupportTicketsResponse = {
+  tickets: SupportTicket[]
+}
+
+export type SupportMessage = {
+  id: string
+  chat_id: string
+  sender: 'user' | 'support'
+  message: string
+  image_url: string | null
+  is_read: boolean
+  created_at: string
+}
+
+export type SupportChat = {
+  id: string
+  user_id: number
+  subject: string
+  status: 'open' | 'closed'
+  priority: 'low' | 'medium' | 'high'
+  assigned_to: string | null
+  created_at: string
+  updated_at: string
+  last_message: string
+  unread_count: number
+  user_unread_count: number
+  messages: SupportMessage[]
+}
+
+export async function fetchSupportTickets(status?: 'open' | 'closed', sessionToken?: string): Promise<SupportTicket[]> {
+  const params = status ? `?status=${encodeURIComponent(status)}` : ''
+  const response = await authFetch(`/admin/support/chats${params}`, {}, sessionToken)
+  if (!response.ok) {
+    throw await parseBackendError('Failed to load support tickets', response)
+  }
+  return response.json() as Promise<SupportTicket[]>
+}
+
+export async function fetchSupportChat(chatId: string, sessionToken?: string): Promise<SupportChat> {
+  const response = await authFetch(`/admin/support/chats/${chatId}`, {}, sessionToken)
+  if (!response.ok) {
+    throw await parseBackendError('Failed to load support chat', response)
+  }
+  return response.json() as Promise<SupportChat>
+}
+
+export async function assignSupportChat(chatId: string, adminName: string, sessionToken?: string): Promise<{ message: string }> {
+  const response = await authFetch(
+    `/admin/support/chats/${chatId}/assign`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ admin_name: adminName }),
+    },
+    sessionToken,
+  )
+  if (!response.ok) {
+    throw await parseBackendError('Failed to assign support chat', response)
+  }
+  return response.json() as Promise<{ message: string }>
+}
+
+export async function sendSupportMessage(
+  chatId: string,
+  message: string,
+  adminName: string,
+  sessionToken?: string,
+): Promise<SupportMessage> {
+  const response = await authFetch(
+    `/admin/support/chats/${chatId}/messages`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message, admin_name: adminName }),
+    },
+    sessionToken,
+  )
+  if (!response.ok) {
+    throw await parseBackendError('Failed to send support message', response)
+  }
+  return response.json() as Promise<SupportMessage>
+}
+
+export async function closeSupportChat(chatId: string, sessionToken?: string): Promise<{ message: string }> {
+  const response = await authFetch(`/admin/support/chats/${chatId}/close`, { method: 'POST' }, sessionToken)
+  if (!response.ok) {
+    throw await parseBackendError('Failed to close support chat', response)
+  }
+  return response.json() as Promise<{ message: string }>
+}
+
+export async function markSupportChatAsRead(chatId: string, sessionToken?: string): Promise<{ message: string }> {
+  const response = await authFetch(`/admin/support/chats/${chatId}/read`, { method: 'POST' }, sessionToken)
+  if (!response.ok) {
+    throw await parseBackendError('Failed to mark support chat as read', response)
+  }
+  return response.json() as Promise<{ message: string }>
+}

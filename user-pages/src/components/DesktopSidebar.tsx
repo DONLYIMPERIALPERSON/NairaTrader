@@ -1,5 +1,6 @@
 import React from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
+import { useSidebar } from '../contexts/SidebarContext'
 
 interface NavItemType {
   label: string
@@ -104,6 +105,7 @@ const navItemsWithSections: SidebarSection[] = [
 const DesktopSidebar: React.FC = () => {
   const navigate = useNavigate()
   const location = useLocation()
+  const { isCollapsed, toggleSidebar } = useSidebar()
 
   const handleNavigation = (href: string) => {
     if (href !== '#') {
@@ -116,61 +118,79 @@ const DesktopSidebar: React.FC = () => {
       position: 'fixed',
       top: '0', // Start from very top
       left: '0',
-      width: '280px',
+      width: isCollapsed ? '80px' : '280px',
       height: '100vh',
       backgroundColor: 'white',
       borderRight: '1px solid #e0e0e0',
       display: 'flex',
       flexDirection: 'column',
-      zIndex: '1100' // Higher than header (1000)
+      zIndex: '1100', // Higher than header (1000)
+      transition: 'width 0.3s ease'
     }}>
-      {/* Logo at top */}
+      {/* Logo and Toggle at top */}
       <div style={{
-        padding: '0px 12px 8px 12px',
+        padding: '8px 12px',
         display: 'flex',
         alignItems: 'center',
-        justifyContent: 'flex-start'
+        justifyContent: isCollapsed ? 'center' : 'space-between'
       }}>
-        <img
-          src="/logo.webp"
-          alt="NairaTrader Logo"
+        {!isCollapsed && (
+          <img
+            src="/logo.webp"
+            alt="NairaTrader Logo"
+            style={{
+              width: '100px',
+              height: '80px',
+              borderRadius: '8px',
+              objectFit: 'contain'
+            }}
+          />
+        )}
+        <button
+          onClick={toggleSidebar}
           style={{
-            width: '140px',
-            height: '112px',
-            borderRadius: '12px',
-            objectFit: 'contain'
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+            padding: '8px',
+            borderRadius: '6px',
+            color: '#666',
+            fontSize: '16px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'all 0.2s ease'
           }}
-        />
+          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8f9fa'}
+          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+          title={isCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
+        >
+          <i className={`fas fa-${isCollapsed ? 'chevron-right' : 'chevron-left'}`}></i>
+        </button>
       </div>
 
       {/* Navigation */}
       <div style={{
         flex: '1',
         padding: '24px 0',
-        overflowY: 'auto',
-        scrollbarWidth: 'none', // Firefox
-        msOverflowStyle: 'none', // IE/Edge
-      }}
-      className="hide-scrollbar">
-        <style>{`
-          .hide-scrollbar::-webkit-scrollbar {
-            display: none; // Chrome, Safari, Opera
-          }
-        `}</style>
+        overflowY: 'auto'
+      }}>
         <nav>
         {navItemsWithSections.map((section, sectionIndex) => (
-          <div key={sectionIndex} style={{marginBottom: '32px'}}>
-            {/* Section Header */}
-            <div style={{
-              padding: '0 24px 8px 24px',
-              fontSize: '12px',
-              fontWeight: '600',
-              color: '#666',
-              textTransform: 'uppercase',
-              letterSpacing: '0.5px'
-            }}>
-              {section.label}
-            </div>
+          <div key={sectionIndex} style={{marginBottom: isCollapsed ? '16px' : '32px'}}>
+            {/* Section Header - Hidden when collapsed */}
+            {!isCollapsed && (
+              <div style={{
+                padding: '0 24px 8px 24px',
+                fontSize: '12px',
+                fontWeight: '600',
+                color: '#666',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px'
+              }}>
+                {section.label}
+              </div>
+            )}
 
             {/* Section Items */}
             <div>
@@ -183,12 +203,14 @@ const DesktopSidebar: React.FC = () => {
                     style={{
                       display: 'flex',
                       alignItems: 'center',
-                      padding: '12px 24px',
+                      justifyContent: isCollapsed ? 'center' : 'flex-start',
+                      padding: isCollapsed ? '12px' : '12px 24px',
                       cursor: item.href === '#' ? 'default' : 'pointer',
                       backgroundColor: isActive ? '#f8f9fa' : 'transparent',
                       borderRight: isActive ? '3px solid #FFD700' : '3px solid transparent',
                       transition: 'all 0.2s ease',
-                      opacity: item.href === '#' ? 0.6 : 1
+                      opacity: item.href === '#' ? 0.6 : 1,
+                      position: 'relative'
                     }}
                     onMouseEnter={(e) => {
                       if (item.href !== '#') {
@@ -200,6 +222,7 @@ const DesktopSidebar: React.FC = () => {
                         e.currentTarget.style.backgroundColor = 'transparent'
                       }
                     }}
+                    title={isCollapsed ? item.label : undefined}
                   >
                     {/* Icon */}
                     <div style={{
@@ -208,24 +231,26 @@ const DesktopSidebar: React.FC = () => {
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      marginRight: '12px',
+                      marginRight: isCollapsed ? '0' : '12px',
                       color: isActive ? '#FFD700' : '#666'
                     }}>
                       <item.icon />
                     </div>
 
-                    {/* Label */}
-                    <span style={{
-                      fontSize: '14px',
-                      fontWeight: '500',
-                      color: isActive ? '#333' : '#666',
-                      flex: '1'
-                    }}>
-                      {item.label}
-                    </span>
+                    {/* Label - Hidden when collapsed */}
+                    {!isCollapsed && (
+                      <span style={{
+                        fontSize: '14px',
+                        fontWeight: '500',
+                        color: isActive ? '#333' : '#666',
+                        flex: '1'
+                      }}>
+                        {item.label}
+                      </span>
+                    )}
 
-                    {/* Badge */}
-                    {item.badge && (
+                    {/* Badge - Hidden when collapsed */}
+                    {!isCollapsed && item.badge && (
                       <div style={{marginLeft: '8px'}}>
                         {item.badge}
                       </div>
@@ -239,23 +264,25 @@ const DesktopSidebar: React.FC = () => {
         </nav>
       </div>
 
-      {/* Name at bottom */}
-      <div style={{
-        padding: '24px',
-        borderTop: '1px solid #e0e0e0',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center'
-      }}>
+      {/* Name at bottom - Hidden when collapsed */}
+      {!isCollapsed && (
         <div style={{
-          fontSize: '16px',
-          fontWeight: '700',
-          color: '#333',
-          letterSpacing: '-0.5px'
+          padding: '24px',
+          borderTop: '1px solid #e0e0e0',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
         }}>
-          NairaTrader
+          <div style={{
+            fontSize: '16px',
+            fontWeight: '700',
+            color: '#333',
+            letterSpacing: '-0.5px'
+          }}>
+            NairaTrader
+          </div>
         </div>
-      </div>
+      )}
     </aside>
   )
 }

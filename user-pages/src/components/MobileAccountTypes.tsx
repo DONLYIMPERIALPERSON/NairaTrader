@@ -189,7 +189,7 @@ const MobileAccountTypes: React.FC = () => {
                       marginTop: '4px',
                       lineHeight: '1.4'
                     }}>
-                      Payout cap for {account.size} accounts is {account.profit_cap} per payout cycle. Exceeding this threshold does not constitute a violation, however payouts will be limited to this cap.
+                      Payout cap for {account.size} accounts is {account.profit_cap} per payout cycle.
                       <div style={{
                         position: 'absolute',
                         top: '-6px',

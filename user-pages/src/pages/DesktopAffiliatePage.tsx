@@ -1,16 +1,141 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import DesktopHeader from '../components/DesktopHeader'
 import DesktopSidebar from '../components/DesktopSidebar'
 import DesktopFooter from '../components/DesktopFooter'
 import '../styles/DesktopAffiliatePage.css'
+import {
+  fetchAffiliateDashboard,
+  requestAffiliatePayout,
+  claimMilestoneReward
+} from '../lib/affiliate'
+import type { AffiliateDashboard, AffiliateReward } from '../lib/affiliate'
 
 const DesktopAffiliatePage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'payouts' | 'transactions' | 'request'>('payouts')
   const [withdrawalAmount, setWithdrawalAmount] = useState<string>('')
+  const [dashboardData, setDashboardData] = useState<AffiliateDashboard | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [claimingReward, setClaimingReward] = useState<number | null>(null)
+  const [requestingPayout, setRequestingPayout] = useState(false)
+
+  useEffect(() => {
+    loadDashboardData()
+  }, [])
+
+  const loadDashboardData = async () => {
+    try {
+      setLoading(true)
+      setError(null)
+      const data = await fetchAffiliateDashboard()
+      setDashboardData(data)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load affiliate data')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const handleCopyReferralLink = () => {
-    navigator.clipboard.writeText('https://nairatrader.com/ref/ABC123')
-    // You could add a toast notification here
+    if (dashboardData?.referral_link) {
+      navigator.clipboard.writeText(dashboardData.referral_link)
+      // You could add a toast notification here
+    }
+  }
+
+  const handleClaimReward = async (levelIndex: number) => {
+    try {
+      setClaimingReward(levelIndex)
+      await claimMilestoneReward(levelIndex)
+      // Reload dashboard data to reflect changes
+      await loadDashboardData()
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to claim reward')
+    } finally {
+      setClaimingReward(null)
+    }
+  }
+
+  const handleRequestPayout = async () => {
+    if (!dashboardData?.stats.available_balance || dashboardData.stats.available_balance <= 0) {
+      alert('No available balance to withdraw')
+      return
+    }
+
+    try {
+      setRequestingPayout(true)
+      await requestAffiliatePayout(dashboardData.stats.available_balance)
+      alert('Payout requested successfully!')
+      // Reload dashboard data to reflect changes
+      await loadDashboardData()
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to request payout')
+    } finally {
+      setRequestingPayout(false)
+    }
+  }
+
+  const formatCurrency = (amount: number) => {
+    return `₦${amount.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  }
+
+  const getRewardStatusText = (reward: AffiliateReward) => {
+    switch (reward.status) {
+      case 'live':
+        return `Progress: ${reward.progress || 0} / ${reward.target || 0} • ${reward.remaining || 0} left`
+      case 'locked':
+        return 'Status: Locked'
+      case 'claimed':
+        return 'Status: Claimed'
+      default:
+        return ''
+    }
+  }
+
+  const getRewardStatusClass = (status: string) => {
+    switch (status) {
+      case 'live':
+        return 'live'
+      case 'locked':
+        return 'locked'
+      case 'claimed':
+        return 'claimed'
+      default:
+        return ''
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="affiliate-page">
+        <DesktopHeader />
+        <DesktopSidebar />
+        <div className="affiliate-content">
+          <div style={{ textAlign: 'center', padding: '50px' }}>
+            <div>Loading affiliate data...</div>
+          </div>
+        </div>
+        <DesktopFooter />
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="affiliate-page">
+        <DesktopHeader />
+        <DesktopSidebar />
+        <div className="affiliate-content">
+          <div style={{ textAlign: 'center', padding: '50px', color: 'red' }}>
+            <div>Error: {error}</div>
+            <button onClick={loadDashboardData} style={{ marginTop: '20px' }}>
+              Try Again
+            </button>
+          </div>
+        </div>
+        <DesktopFooter />
+      </div>
+    )
   }
 
   return (
@@ -38,7 +163,7 @@ const DesktopAffiliatePage: React.FC = () => {
           <div className="referral-input-group">
             <input
               type="text"
-              value="https://nairatrader.com/ref/ABC123"
+              value={dashboardData?.referral_link || 'Loading...'}
               readOnly
               className="referral-input"
             />
@@ -58,7 +183,7 @@ const DesktopAffiliatePage: React.FC = () => {
             <div className="stat-icon">
               <i className="fas fa-wallet"></i>
             </div>
-            <div className="stat-value">₦0.00</div>
+            <div className="stat-value">{formatCurrency(dashboardData?.stats.available_balance || 0)}</div>
             <div className="stat-label">Available Balance</div>
           </div>
 
@@ -67,7 +192,7 @@ const DesktopAffiliatePage: React.FC = () => {
             <div className="stat-icon">
               <i className="fas fa-chart-line"></i>
             </div>
-            <div className="stat-value">₦3,420.00</div>
+            <div className="stat-value">{formatCurrency(dashboardData?.stats.total_earned || 0)}</div>
             <div className="stat-label">Total Earned</div>
           </div>
 
@@ -76,7 +201,7 @@ const DesktopAffiliatePage: React.FC = () => {
             <div className="stat-icon">
               <i className="fas fa-users"></i>
             </div>
-            <div className="stat-value">1</div>
+            <div className="stat-value">{dashboardData?.stats.referrals || 0}</div>
             <div className="stat-label">Referrals</div>
           </div>
 
@@ -85,7 +210,7 @@ const DesktopAffiliatePage: React.FC = () => {
             <div className="stat-icon">
               <i className="fas fa-eye"></i>
             </div>
-            <div className="stat-value">4</div>
+            <div className="stat-value">{dashboardData?.stats.impressions || 0}</div>
             <div className="stat-label">Impressions</div>
           </div>
         </div>
@@ -96,59 +221,26 @@ const DesktopAffiliatePage: React.FC = () => {
           <p>Earn free trading accounts by referring new traders</p>
 
           <div className="rewards-grid">
-            {/* Reward 1 */}
-            <div className="reward-card">
-              <div className="reward-header">
-                <div>
-                  <div className="reward-title">₦600,000 Account</div>
-                  <div className="reward-status live">Status: Live</div>
-                  <div className="reward-progress">Progress: 1 / 20 • 19 left</div>
-                </div>
-                <button className="claim-button" disabled={true}>Claim</button>
-              </div>
-            </div>
-
-            {/* Reward 2 */}
-            <div className="reward-card">
-              <div className="reward-header">
-                <div>
-                  <div className="reward-title">₦800,000 Account</div>
-                  <div className="reward-status locked">
-                    Status: Locked
-                    <i className="fas fa-lock"></i>
+            {dashboardData?.rewards.map((reward, index) => (
+              <div key={index} className="reward-card">
+                <div className="reward-header">
+                  <div>
+                    <div className="reward-title">{formatCurrency(reward.amount)} Account</div>
+                    <div className={`reward-status ${getRewardStatusClass(reward.status)}`}>
+                      {getRewardStatusText(reward)}
+                      {reward.status === 'locked' && <i className="fas fa-lock"></i>}
+                    </div>
                   </div>
+                  <button
+                    className="claim-button"
+                    disabled={reward.status !== 'live' || claimingReward === index}
+                    onClick={() => handleClaimReward(index)}
+                  >
+                    {claimingReward === index ? 'Claiming...' : 'Claim'}
+                  </button>
                 </div>
-                <button className="claim-button" disabled={true}>Claim</button>
               </div>
-            </div>
-
-            {/* Reward 3 */}
-            <div className="reward-card">
-              <div className="reward-header">
-                <div>
-                  <div className="reward-title">₦1,500,000 Account</div>
-                  <div className="reward-status locked">
-                    Status: Locked
-                    <i className="fas fa-lock"></i>
-                  </div>
-                </div>
-                <button className="claim-button" disabled={true}>Claim</button>
-              </div>
-            </div>
-
-            {/* Reward 4 */}
-            <div className="reward-card">
-              <div className="reward-header">
-                <div>
-                  <div className="reward-title">₦1,500,000 Account</div>
-                  <div className="reward-status locked">
-                    Status: Locked
-                    <i className="fas fa-lock"></i>
-                  </div>
-                </div>
-                <button className="claim-button" disabled={true}>Claim</button>
-              </div>
-            </div>
+            ))}
           </div>
         </div>
 
@@ -187,11 +279,19 @@ const DesktopAffiliatePage: React.FC = () => {
                   <span>Commission</span>
                 </div>
 
-                <div className="table-row">
-                  <span>16/01/2026 6:16 am</span>
-                  <span>Trade with ₦800k x1</span>
-                  <span>₦3,420.00</span>
-                </div>
+                {dashboardData?.recent_transactions.length ? (
+                  dashboardData.recent_transactions.map((transaction, index) => (
+                    <div key={index} className="table-row">
+                      <span>{transaction.date}</span>
+                      <span>{transaction.type}</span>
+                      <span>{formatCurrency(transaction.commission)}</span>
+                    </div>
+                  ))
+                ) : (
+                  <div className="table-row">
+                    <span style={{ gridColumn: '1 / -1', textAlign: 'center' }}>No transactions yet</span>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -207,11 +307,19 @@ const DesktopAffiliatePage: React.FC = () => {
                   <span>Amount</span>
                 </div>
 
-                <div className="payouts-row">
-                  <span className="date">19/01/2026 8:01 am</span>
-                  <span className="status">Approved</span>
-                  <span className="amount">₦3,420.00</span>
-                </div>
+                {dashboardData?.recent_payouts.length ? (
+                  dashboardData.recent_payouts.map((payout, index) => (
+                    <div key={index} className="payouts-row">
+                      <span className="date">{payout.date}</span>
+                      <span className={`status ${payout.status.toLowerCase()}`}>{payout.status}</span>
+                      <span className="amount">{formatCurrency(payout.amount)}</span>
+                    </div>
+                  ))
+                ) : (
+                  <div className="payouts-row">
+                    <span style={{ gridColumn: '1 / -1', textAlign: 'center' }}>No payouts yet</span>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -223,12 +331,26 @@ const DesktopAffiliatePage: React.FC = () => {
                 <div className="payout-form">
                   {/* Withdraw Button */}
                   <div className="button-group">
-                    <button className="withdraw-button">Withdraw Now</button>
+                    <button
+                      className="withdraw-button"
+                      onClick={handleRequestPayout}
+                      disabled={requestingPayout || !dashboardData?.stats.available_balance}
+                    >
+                      {requestingPayout ? 'Requesting...' : 'Withdraw Now'}
+                    </button>
                   </div>
 
                   {/* Saved Account Info */}
                   <div className="account-info">
-                    <div><strong>Saved Account:</strong> Lucky Chi — Kuda Microfinance Bank (3000469725)</div>
+                    {dashboardData?.bank_details ? (
+                      <div>
+                        <strong>Saved Account:</strong> {dashboardData.bank_details.account_name} — {dashboardData.bank_details.bank_name} ({dashboardData.bank_details.account_number})
+                      </div>
+                    ) : (
+                      <div style={{ color: 'red' }}>
+                        <strong>No bank account saved.</strong> Please save your bank details to request payouts.
+                      </div>
+                    )}
                   </div>
                 </div>
             </div>

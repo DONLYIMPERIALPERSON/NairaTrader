@@ -1,6 +1,6 @@
 import { getSessionToken } from '@descope/react-sdk'
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5500'
+const API_BASE_URL = import.meta.env.VITE_BACKEND_URL
 
 export interface FundedAccountPayout {
   account_id: number;

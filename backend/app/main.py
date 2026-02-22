@@ -3,6 +3,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
+from app.api.affiliate_routes import router as affiliate_router
+from app.api.admin_affiliate_routes import router as admin_affiliate_router
 from app.api.auth_routes import router as auth_router
 from app.api.admin_auth_routes import router as admin_auth_router
 from app.api.admin_certificates_routes import router as admin_certificates_router
@@ -19,6 +21,8 @@ from app.api.pin_routes import router as pin_router
 from app.api.payout_routes import router as payout_router
 from app.api.profile_routes import router as profile_router
 from app.api.certificate_routes import router as certificate_router
+from app.api.support_routes import router as support_router
+from app.api.admin_support_routes import router as admin_support_router
 from app.core.config import settings
 
 # Configure logging
@@ -44,22 +48,26 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(auth_router)
-app.include_router(admin_auth_router)
-app.include_router(admin_certificates_router)
-app.include_router(admin_kyc_router)
-app.include_router(admin_orders_router)
-app.include_router(admin_payout_router)
-app.include_router(admin_users_router)
-app.include_router(challenge_config_router)
-app.include_router(challenge_accounts_router)
-app.include_router(coupon_router)
-app.include_router(payment_router)
-app.include_router(mt5_router)
-app.include_router(payout_router)
-app.include_router(profile_router)
-app.include_router(pin_router)
-app.include_router(certificate_router)
+app.include_router(affiliate_router, tags=["Affiliate"])
+app.include_router(admin_affiliate_router, tags=["Admin Affiliate"])
+app.include_router(auth_router, tags=["Authentication"])
+app.include_router(admin_auth_router, tags=["Admin Authentication"])
+app.include_router(admin_certificates_router, tags=["Admin Certificates"])
+app.include_router(admin_kyc_router, tags=["Admin KYC"])
+app.include_router(admin_orders_router, tags=["Admin Orders"])
+app.include_router(admin_payout_router, tags=["Admin Payouts"])
+app.include_router(admin_users_router, tags=["Admin Users"])
+app.include_router(challenge_config_router, tags=["Challenge Config"])
+app.include_router(challenge_accounts_router, tags=["Challenge Accounts"])
+app.include_router(coupon_router, tags=["Coupons"])
+app.include_router(payment_router, tags=["Payment"])
+app.include_router(mt5_router, tags=["MT5"])
+app.include_router(payout_router, tags=["Payouts"])
+app.include_router(profile_router, tags=["Profile"])
+app.include_router(pin_router, tags=["PIN"])
+app.include_router(certificate_router, tags=["Certificates"])
+app.include_router(support_router, tags=["Support"])
+app.include_router(admin_support_router, tags=["Admin Support"])
 
 
 @app.get("/health", tags=["Health"])

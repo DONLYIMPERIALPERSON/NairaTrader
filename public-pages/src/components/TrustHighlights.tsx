@@ -37,10 +37,10 @@ export default function TrustHighlights() {
             <div className="max-w-6xl mx-auto px-4">
                 <div className="text-center mb-12">
                     <p className="text-sm font-medium text-yellow-300 uppercase tracking-wide mb-3">
-                        FREE 1.5M TO 3M
+                        SCALE FROM 0 TO 100
                     </p>
                     <h2 className="text-2xl md:text-4xl text-white font-semibold">
-                        Free 1.5 and 3m Live Funded
+                        Free 1.5M or 3M Live Funded Account
                     </h2>
                     <p className="max-w-2xl mx-auto text-sm text-gray-400 my-3">
                         Yes, you heard it correctly — no evaluation, just a live funded account with instant payout enabled.

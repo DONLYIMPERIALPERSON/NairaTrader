@@ -20,7 +20,7 @@ const DesktopFooter: React.FC = () => {
           margin: '0',
           fontWeight: '500'
         }}>
-          Copyright © 2026 by NairaTrader.is
+          Copyright © 2026 by NairaTrader.com
         </p>
       </div>
     </footer>

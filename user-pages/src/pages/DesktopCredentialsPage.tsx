@@ -12,7 +12,6 @@ const DesktopCredentialsPage: React.FC = () => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [showPassword, setShowPassword] = useState(false)
-  const [showInvestorPassword, setShowInvestorPassword] = useState(false)
 
   const challengeId = searchParams.get('challenge_id')
 
@@ -116,30 +115,6 @@ const DesktopCredentialsPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Password */}
-          <div className="credential-card">
-            <div className="credential-content">
-              <div className="credential-info">
-                <div className="credential-icon password-icon">
-                  <i className="fas fa-key"></i>
-                </div>
-                <div className="credential-details">
-                  <div className="credential-label">Password</div>
-                  <div className="credential-value">
-                    {showPassword ? (accountData.credentials?.password || 'N/A') : '••••••••••••'}
-                  </div>
-                </div>
-              </div>
-              <button
-                className="action-button"
-                onClick={() => setShowPassword(!showPassword)}
-              >
-                <i className={`fas fa-${showPassword ? 'eye-slash' : 'eye'}`}></i>
-                {showPassword ? 'Hide' : 'Show'}
-              </button>
-            </div>
-          </div>
-
           {/* Account Number */}
           <div className="credential-card">
             <div className="credential-content">
@@ -162,36 +137,28 @@ const DesktopCredentialsPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Investor Password */}
+          {/* Password */}
           <div className="credential-card">
             <div className="credential-content">
               <div className="credential-info">
-                <div className="credential-icon investor-icon">
-                  <i className="fas fa-lock"></i>
+                <div className="credential-icon password-icon">
+                  <i className="fas fa-key"></i>
                 </div>
                 <div className="credential-details">
-                  <div className="credential-label">Investor Password</div>
+                  <div className="credential-label">Password</div>
                   <div className="credential-value">
-                    {showInvestorPassword ? (accountData.credentials?.investor_password || 'N/A') : '••••••••'}
+                    {showPassword ? (accountData.credentials?.password || 'N/A') : '••••••••••••'}
                   </div>
                 </div>
               </div>
               <button
                 className="action-button"
-                onClick={() => setShowInvestorPassword(!showInvestorPassword)}
+                onClick={() => setShowPassword(!showPassword)}
               >
-                <i className={`fas fa-${showInvestorPassword ? 'eye-slash' : 'eye'}`}></i>
-                {showInvestorPassword ? 'Hide' : 'Show'}
+                <i className={`fas fa-${showPassword ? 'eye-slash' : 'eye'}`}></i>
+                {showPassword ? 'Hide' : 'Show'}
               </button>
             </div>
-          </div>
-        </div>
-
-        {/* Info Note */}
-        <div className="info-note">
-          <div className="info-note-content">
-            <i className="fas fa-info-circle"></i>
-            <span>Investor password – read only access for monitoring</span>
           </div>
         </div>
       </div>
