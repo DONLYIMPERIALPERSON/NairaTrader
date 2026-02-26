@@ -1,4 +1,5 @@
 import json
+import logging
 from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
@@ -10,6 +11,7 @@ from app.db.session import SessionLocal
 from app.models.email_log import EmailLog
 
 
+logger = logging.getLogger(__name__)
 EMAIL_TEMPLATE_DIR = Path(__file__).resolve().parent.parent / "templates" / "emails"
 HTML_TEMPLATE_PATH = EMAIL_TEMPLATE_DIR / "email.html"
 TEXT_TEMPLATE_PATH = EMAIL_TEMPLATE_DIR / "email.txt"
@@ -742,6 +744,7 @@ def _record_email_log(
         )
         db.commit()
     except Exception:
+        logger.exception("Failed to record email log", extra={"to_email": to_email, "subject": subject, "status": status})
         db.rollback()
     finally:
         db.close()

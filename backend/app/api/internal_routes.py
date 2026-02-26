@@ -19,6 +19,7 @@ from app.schemas.challenge_account import (
     RefreshJobCompleteRequest,
 )
 from app.services.challenge_objectives import ASSIGNED_STAGES, process_challenge_feed
+from app.tasks import process_mt5_feed
 
 router = APIRouter(prefix="/internal", tags=["Internal"])
 feed_key_header = APIKeyHeader(name="X-Challenge-Feed-Secret", auto_error=False)
@@ -72,31 +73,29 @@ def internal_feed_update(
     if challenge is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Challenge account not found")
 
-    # Process the feed update using existing logic
-    updated_challenge, _ = process_challenge_feed(
-        db,
-        challenge=challenge,
+    # Dispatch feed processing to the task so breach/pass emails are triggered consistently
+    process_mt5_feed.delay(
+        challenge_id=challenge.challenge_id,
         balance=payload.balance,
-        equity=payload.equity,
+        equity=payload.equity if payload.equity is not None else payload.balance,
         closed_trade_durations_seconds=payload.closed_trade_durations_seconds,
-        trades=payload.trades,
-        scalping_breach_increment=payload.scalping_breach_increment,
-        equity_breach_signal=payload.equity_breach_signal,
-        balance_breach_signal=payload.balance_breach_signal,
+        scalping_breach_increment=payload.scalping_breach_increment or 0,
+        equity_breach_signal=payload.equity_breach_signal or False,
+        balance_breach_signal=payload.balance_breach_signal or False,
         stage_pass_signal=payload.stage_pass_signal,
-        closed_trades_count_increment=payload.closed_trades_count_increment,
-        winning_trades_count_increment=payload.winning_trades_count_increment,
-        lots_traded_increment=payload.lots_traded_increment,
-        today_closed_pnl=payload.today_closed_pnl,
-        today_trades_count=payload.today_trades_count,
-        today_lots_total=payload.today_lots_total,
-        observed_at=payload.observed_at,
+        closed_trades_count_increment=payload.closed_trades_count_increment or 0,
+        winning_trades_count_increment=payload.winning_trades_count_increment or 0,
+        lots_traded_increment=payload.lots_traded_increment or 0,
+        today_closed_pnl=payload.today_closed_pnl or 0,
+        today_trades_count=payload.today_trades_count or 0,
+        today_lots_total=payload.today_lots_total or 0,
+        observed_at=payload.observed_at or datetime.now(timezone.utc),
     )
 
-    # Update last_feed_at timestamp
-    updated_challenge.last_feed_at = datetime.now(timezone.utc)
+    # Update last_feed_at timestamp without waiting for the task
+    challenge.last_feed_at = datetime.now(timezone.utc)
     if engine_id:
-        updated_challenge.last_feed_engine_id = engine_id
+        challenge.last_feed_engine_id = engine_id
     db.commit()
     return {"status": "ok"}
 

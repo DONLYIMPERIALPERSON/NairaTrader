@@ -65,8 +65,8 @@ class ChallengeFeedUpdateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     account_number: str = Field(min_length=1, max_length=120)
-    balance: float = Field(gt=0)
-    equity: float | None = Field(default=None, gt=0)
+    balance: float = Field(ge=0)
+    equity: float | None = Field(default=None, ge=0)
     closed_trade_durations_seconds: list[int] = Field(default_factory=list)
     scalping_breach_increment: int | None = Field(default=None, ge=0)
     equity_breach_signal: bool | None = None
@@ -84,8 +84,8 @@ class ChallengeFeedUpdateRequest(BaseModel):
 class InternalChallengeFeedUpdateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    balance: float = Field(gt=0)
-    equity: float | None = Field(default=None, gt=0)
+    balance: float = Field(ge=0)
+    equity: float | None = Field(default=None, ge=0)
     closed_trade_durations_seconds: list[int] = Field(default_factory=list)
     trades: list[TradeInfo] = Field(default_factory=list)
     scalping_breach_increment: int | None = Field(default=None, ge=0)

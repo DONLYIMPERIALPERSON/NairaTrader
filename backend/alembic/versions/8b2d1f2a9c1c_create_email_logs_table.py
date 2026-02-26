@@ -26,7 +26,7 @@ def upgrade() -> None:
         sa.Column('subject', sa.String(length=255), nullable=False),
         sa.Column('status', sa.String(length=50), nullable=False),
         sa.Column('error_message', sa.Text(), nullable=True),
-        sa.Column('created_at', sa.DateTime(), nullable=False),
+        sa.Column('created_at', sa.DateTime(), nullable=False, server_default=sa.func.now()),
         sa.PrimaryKeyConstraint('id')
     )
     op.create_index(op.f('ix_email_logs_created_at'), 'email_logs', ['created_at'], unique=False)

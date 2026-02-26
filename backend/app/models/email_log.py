@@ -12,4 +12,10 @@ class EmailLog(Base):
     subject: Mapped[str] = mapped_column(String(255), nullable=False)
     status: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
-    created_at: Mapped[DateTime] = mapped_column(DateTime, nullable=False, default=func.now(), index=True)
+    created_at: Mapped[DateTime] = mapped_column(
+        DateTime,
+        nullable=False,
+        server_default=func.now(),
+        default=func.now(),
+        index=True,
+    )
