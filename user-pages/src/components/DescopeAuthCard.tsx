@@ -76,13 +76,47 @@ const DescopeAuthCard: React.FC<DescopeAuthCardProps> = ({ title, subtitle }) =>
     return true
   }, [])
 
+  async function submitInteraction(interactionId: string, form: Record<string, unknown> = {}) {
+    if (!nextAction) {
+      return
+    }
+    if (loading) {
+      return
+    }
+    setInteractionLoading(true)
+    try {
+      await nextAction(interactionId, form)
+    } catch (err) {
+      console.error('Interaction error:', err)
+      setInteractionLoading(false)
+      // Try to extract error message from the error - handle different Descope error formats
+      let errorMessage = 'Authentication failed. Please try again.'
+
+      if (err instanceof Error) {
+        errorMessage = err.message
+      } else if (typeof err === 'string') {
+        errorMessage = err
+      } else if (err && typeof err === 'object') {
+        // Check for common error message properties
+        const errorObj = err as any
+        errorMessage = errorObj.message || errorObj.error || errorObj.errorMessage ||
+                      errorObj.description || errorObj.detail || String(err)
+      }
+
+      // Clean up the error message (remove " - Error" suffix if present)
+      errorMessage = errorMessage.replace(/\s*-\s*Error\s*$/, '')
+
+      setError(errorMessage)
+    }
+  }
+
   const handleSetPasswordSubmit = useCallback(() => {
     if (!validateNewPassword(newPassword, confirmPassword)) {
       return
     }
     setError('')
     submitInteraction('n6WbbqzlwS', { newPassword, confirmPassword })
-  }, [confirmPassword, newPassword, submitInteraction, validateNewPassword])
+  }, [confirmPassword, newPassword, validateNewPassword])
 
   const handleReplacePasswordSubmit = useCallback(() => {
     if (!password.trim()) {
@@ -94,7 +128,7 @@ const DescopeAuthCard: React.FC<DescopeAuthCardProps> = ({ title, subtitle }) =>
     }
     setError('')
     submitInteraction('update-password', { password, newPassword, confirmPassword })
-  }, [confirmPassword, newPassword, password, submitInteraction, validateNewPassword])
+  }, [confirmPassword, newPassword, password, validateNewPassword])
 
   const handleSuccess = useCallback(async (event: DescopeSuccessPayload) => {
     setError('')
@@ -162,39 +196,7 @@ const DescopeAuthCard: React.FC<DescopeAuthCardProps> = ({ title, subtitle }) =>
     return true
   }, [])
 
-  const submitInteraction = useCallback(async (interactionId: string, form: Record<string, unknown> = {}) => {
-    if (!nextAction) {
-      return
-    }
-    if (loading) {
-      return
-    }
-    setInteractionLoading(true)
-    try {
-      await nextAction(interactionId, form)
-    } catch (err) {
-      console.error('Interaction error:', err)
-      setInteractionLoading(false)
-      // Try to extract error message from the error - handle different Descope error formats
-      let errorMessage = 'Authentication failed. Please try again.'
-
-      if (err instanceof Error) {
-        errorMessage = err.message
-      } else if (typeof err === 'string') {
-        errorMessage = err
-      } else if (err && typeof err === 'object') {
-        // Check for common error message properties
-        const errorObj = err as any
-        errorMessage = errorObj.message || errorObj.error || errorObj.errorMessage ||
-                      errorObj.description || errorObj.detail || String(err)
-      }
-
-      // Clean up the error message (remove " - Error" suffix if present)
-      errorMessage = errorMessage.replace(/\s*-\s*Error\s*$/, '')
-
-      setError(errorMessage)
-    }
-  }, [loading, nextAction])
+  
 
   const isBusy = interactionLoading || loading
   const continueButtonText = isBusy ? 'Please wait...' : 'Continue'
