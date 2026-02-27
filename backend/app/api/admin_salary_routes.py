@@ -32,7 +32,7 @@ from app.tasks import send_admin_settings_otp_email
 
 router = APIRouter(prefix="/admin/salaries", tags=["Admin Salaries"])
 
-ADMIN_SALARY_OTP_PURPOSE = "admin_salary_disbursement"
+ADMIN_SALARY_OTP_PURPOSE = "admin_salary_pay"
 
 
 def _get_bank_name(bank_code: str) -> str:
