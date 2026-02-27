@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import DesktopHeader from '../components/DesktopHeader'
 import DesktopSidebar from '../components/DesktopSidebar'
@@ -41,6 +41,7 @@ const DesktopStartChallengePage: React.FC = () => {
   const [showPaymentModal, setShowPaymentModal] = useState(false)
   const [currentOrder, setCurrentOrder] = useState<PaymentOrderResponse | null>(null)
   const [modalStatus, setModalStatus] = useState<'waiting' | 'confirming' | 'success'>('waiting')
+  const pollingActiveRef = useRef(false)
 
   const inferPlanId = (account: AccountData | undefined): string => {
     if (!account) return ''
@@ -80,6 +81,7 @@ const DesktopStartChallengePage: React.FC = () => {
         setCurrentOrder(order)
         setShowPaymentModal(true)
         setPaymentStatus('')
+        void startPaymentPolling(order.provider_order_id)
 
       })
       .catch((err: unknown) => {
@@ -114,23 +116,33 @@ const DesktopStartChallengePage: React.FC = () => {
     }
   }
 
-  const handleProceedToPayment = async () => {
-    if (!currentOrder) return
-
-    // Start polling for payment confirmation
-    for (let i = 0; i < 12; i += 1) {
+  const startPaymentPolling = async (orderId: string) => {
+    pollingActiveRef.current = true
+    setModalStatus('confirming')
+    for (let i = 0; i < 24; i += 1) {
+      if (!pollingActiveRef.current) {
+        return
+      }
       await new Promise((resolve) => setTimeout(resolve, 5000))
       try {
-        const refreshed = await refreshPaymentOrderStatus(currentOrder.provider_order_id)
+        if (!pollingActiveRef.current) {
+          return
+        }
+        const refreshed = await refreshPaymentOrderStatus(orderId)
         if (refreshed.status === 'paid' && refreshed.assignment_status === 'assigned' && refreshed.challenge_id) {
+          if (!pollingActiveRef.current) {
+            return
+          }
           setModalStatus('success')
-          // Auto redirect after 3 seconds
           setTimeout(() => {
             navigate('/')
           }, 3000)
           return
         }
         if (refreshed.status === 'failed' || refreshed.status === 'expired') {
+          if (!pollingActiveRef.current) {
+            return
+          }
           setModalStatus('waiting')
           setPaymentStatus(`Payment ${refreshed.status}. Please try again.`)
           setShowPaymentModal(false)
@@ -141,13 +153,18 @@ const DesktopStartChallengePage: React.FC = () => {
       }
     }
 
-    // If polling completes without success, reset to waiting state
+    if (!pollingActiveRef.current) {
+      return
+    }
+
     setModalStatus('waiting')
     setPaymentStatus('Payment confirmation timed out. Please check your payment status.')
     setShowPaymentModal(false)
   }
 
   const handleCloseModal = () => {
+    pollingActiveRef.current = false
+    setModalStatus('waiting')
     setShowPaymentModal(false)
     setCurrentOrder(null)
   }
@@ -256,10 +273,7 @@ const DesktopStartChallengePage: React.FC = () => {
             accountNumber: currentOrder.payer_virtual_acc_no || '',
             amount: `₦${(currentOrder.net_amount_kobo / 100).toLocaleString()}`,
           }}
-          onProceedToPayment={handleProceedToPayment}
-          isProcessing={false}
           status={modalStatus}
-          onStatusChange={setModalStatus}
         />
       )}
     </div>

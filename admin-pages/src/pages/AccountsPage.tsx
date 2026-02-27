@@ -98,11 +98,11 @@ const AccountsPage = ({ onOpenProfile }: AccountsPageProps) => {
                       onOpenProfile({
                         user_id: row.user_id,
                         name: row.trader_name ?? `User ${row.user_id}`,
-                        email: `user${row.user_id}@mail.com`,
-                        accounts: '1 / 0',
-                        revenue: '+₦0 (dummy)',
-                        orders: '1',
-                        payouts: '₦0',
+                        email: row.trader_email ?? '',
+                        accounts: '',
+                        revenue: '',
+                        orders: '',
+                        payouts: '',
                       })
                     }
                   >

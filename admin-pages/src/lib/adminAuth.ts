@@ -115,6 +115,7 @@ export type ChallengeAccountListItem = {
   challenge_id: string
   user_id: number
   trader_name: string | null
+  trader_email?: string | null
   account_size: string
   phase: 'Phase 1' | 'Phase 2' | 'Funded'
   mt5_account: string | null
@@ -1296,6 +1297,7 @@ export type UserChallengeAccount = {
   challenge_id: string
   user_id: number
   trader_name: string | null
+  trader_email?: string | null
   account_size: string
   phase: 'Phase 1' | 'Phase 2' | 'Funded'
   mt5_account: string | null
@@ -1356,7 +1358,7 @@ export async function fetchUserProfile(userId: number, sessionToken?: string): P
 }
 
 export async function fetchUserChallengeAccounts(userId: number, sessionToken?: string): Promise<UserChallengeAccount[]> {
-  const response = await authFetch(`/admin/challenge-accounts?user_id=${userId}`, {}, sessionToken)
+  const response = await authFetch(`/admin/challenge-accounts?user_id=${userId}&active_only=true`, {}, sessionToken)
   if (!response.ok) {
     throw await parseBackendError('Failed to load user challenge accounts', response)
   }

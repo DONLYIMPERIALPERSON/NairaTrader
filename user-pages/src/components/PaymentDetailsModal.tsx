@@ -10,20 +10,14 @@ interface PaymentDetailsModalProps {
     accountNumber: string
     amount: string
   }
-  onProceedToPayment: () => void
-  isProcessing: boolean
   status?: 'waiting' | 'confirming' | 'success'
-  onStatusChange?: (status: 'waiting' | 'confirming' | 'success') => void
 }
 
 const PaymentDetailsModal: React.FC<PaymentDetailsModalProps> = ({
   isOpen,
   onClose,
   paymentDetails,
-  onProceedToPayment,
-  isProcessing,
   status = 'waiting',
-  onStatusChange,
 }) => {
   const [copiedField, setCopiedField] = useState<string | null>(null)
   const [timeLeft, setTimeLeft] = useState(30 * 60) // 30 minutes in seconds
@@ -63,12 +57,6 @@ const PaymentDetailsModal: React.FC<PaymentDetailsModalProps> = ({
     } catch (err) {
       console.error('Failed to copy text: ', err)
     }
-  }
-
-  const handleProceedClick = () => {
-    setCurrentStatus('confirming')
-    onStatusChange?.('confirming')
-    onProceedToPayment()
   }
 
   if (!isOpen) return null
@@ -163,23 +151,6 @@ const PaymentDetailsModal: React.FC<PaymentDetailsModalProps> = ({
               </div>
             </div>
 
-            <div className="payment-modal-footer">
-              <button
-                className="payment-cancel-button"
-                onClick={onClose}
-                disabled={isProcessing}
-              >
-                Cancel
-              </button>
-              <button
-                className="payment-proceed-button"
-                onClick={handleProceedClick}
-                disabled={isProcessing}
-              >
-                <i className="fas fa-check"></i>
-                I've Made the Transfer
-              </button>
-            </div>
           </>
         )
 
@@ -188,7 +159,7 @@ const PaymentDetailsModal: React.FC<PaymentDetailsModalProps> = ({
           <>
             <div className="payment-modal-header">
               <h2>Confirming Payment</h2>
-              <button className="payment-modal-close" onClick={onClose} disabled>
+              <button className="payment-modal-close" onClick={onClose}>
                 <i className="fas fa-times"></i>
               </button>
             </div>
@@ -212,7 +183,17 @@ const PaymentDetailsModal: React.FC<PaymentDetailsModalProps> = ({
 
                 <div className="payment-detail-row">
                   <label>Account Number:</label>
-                  <span className="account-number">{paymentDetails.accountNumber}</span>
+                  <div className="payment-detail-value">
+                    <span className="account-number">{paymentDetails.accountNumber}</span>
+                    <button
+                      className="copy-button"
+                      onClick={() => void copyToClipboard(paymentDetails.accountNumber, 'number')}
+                      title="Copy account number"
+                    >
+                      <i className="fas fa-copy"></i>
+                      {copiedField === 'number' && <span className="copied-text">Copied!</span>}
+                    </button>
+                  </div>
                 </div>
 
                 <div className="payment-detail-row payment-amount-row">
@@ -278,7 +259,7 @@ const PaymentDetailsModal: React.FC<PaymentDetailsModalProps> = ({
   }
 
   return (
-    <div className="payment-modal-overlay" onClick={currentStatus === 'waiting' ? onClose : undefined}>
+    <div className="payment-modal-overlay" onClick={onClose}>
       <div className="payment-modal-content" onClick={(e) => e.stopPropagation()}>
         {renderStatusContent()}
       </div>

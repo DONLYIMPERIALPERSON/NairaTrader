@@ -260,9 +260,9 @@ const UserProfilePage = ({ user, onBack }: UserProfilePageProps) => {
           </article>
           <article>
             <h4>Account Snapshot</h4>
-            <p><strong>Accounts:</strong> {profileData?.accounts || user.accounts}</p>
-            <p><strong>Revenue:</strong> {profileData?.revenue || user.revenue}</p>
-            <p><strong>Payouts:</strong> {profileData?.payouts || user.payouts}</p>
+            <p><strong>Accounts:</strong> {profileData?.accounts || '—'}</p>
+            <p><strong>Revenue:</strong> {profileData?.revenue || '—'}</p>
+            <p><strong>Payouts:</strong> {profileData?.payouts || '—'}</p>
           </article>
         </div>
       )
@@ -588,19 +588,19 @@ const UserProfilePage = ({ user, onBack }: UserProfilePageProps) => {
       <div className="admin-dashboard-card user-profile-summary">
         <article>
           <span>Accounts</span>
-          <strong>{user.accounts}</strong>
+          <strong>{profileData?.accounts || '—'}</strong>
         </article>
         <article>
           <span>Revenue</span>
-          <strong>{user.revenue}</strong>
+          <strong>{profileData?.revenue || '—'}</strong>
         </article>
         <article>
           <span>Orders</span>
-          <strong>{user.orders}</strong>
+          <strong>{profileData?.orders || '—'}</strong>
         </article>
         <article>
           <span>Payouts</span>
-          <strong>{user.payouts}</strong>
+          <strong>{profileData?.payouts || '—'}</strong>
         </article>
       </div>
 

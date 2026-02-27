@@ -86,7 +86,7 @@ def get_affiliate_dashboard(
     """Get the complete affiliate dashboard data."""
     affiliate = _ensure_affiliate_row(db, current_user.id)
     code = affiliate.code
-    referral_link = f"https://nairatrader.com/ref/{code}"
+    referral_link = f"https://app.nairatrader.com/ref/{code}"
 
     # Calculate stats
     # Available balance = total commissions - approved payouts

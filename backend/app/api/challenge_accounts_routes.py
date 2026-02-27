@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.security import APIKeyHeader
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
@@ -72,6 +72,7 @@ def _to_row(
         "challenge_id": challenge.challenge_id,
         "user_id": challenge.user_id,
         "trader_name": (user.nick_name or user.email) if user else None,
+        "trader_email": user.email if user else None,
         "account_size": challenge.account_size,
         "phase": challenge.current_stage,
         "mt5_account": active.account_number if active else None,
@@ -106,10 +107,17 @@ def _to_breach_row(
 
 @router.get("")
 def list_challenge_accounts(
+    user_id: int | None = Query(default=None),
+    active_only: bool = Query(default=False),
     _: User = Depends(get_current_admin_allowlisted),
     db: Session = Depends(get_db),
 ) -> dict[str, list[dict[str, str | int | None]]]:
-    rows = db.scalars(select(ChallengeAccount).order_by(ChallengeAccount.id.desc())).all()
+    query = select(ChallengeAccount)
+    if user_id is not None:
+        query = query.where(ChallengeAccount.user_id == user_id)
+    if active_only:
+        query = query.where(ChallengeAccount.objective_status == "active")
+    rows = db.scalars(query.order_by(ChallengeAccount.id.desc())).all()
     active_ids = [row.active_mt5_account_id for row in rows if row.active_mt5_account_id is not None]
     user_ids = sorted({row.user_id for row in rows})
     mt5_rows = db.scalars(select(MT5Account).where(MT5Account.id.in_(active_ids))).all() if active_ids else []

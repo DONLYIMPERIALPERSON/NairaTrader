@@ -59,6 +59,20 @@ def send_kyc_approved_email(to_email: str, account_name: str, bank_name: str, ba
 def send_announcement_email(to_emails: list[str], subject: str, message: str):
     sync_send_announcement_email(to_emails=to_emails, subject=subject, message=message)
 
+
+def _try_send_challenge_mail(*, user: User | None, subject: str, message: str) -> None:
+    if user is None:
+        return
+    try:
+        if "passed" in subject.lower() or "passed" in message.lower():
+            send_challenge_pass_email.delay(to_email=user.email, message=message)
+        elif "breached" in subject.lower() or "breach" in message.lower():
+            send_challenge_breach_email.delay(to_email=user.email, message=message)
+        else:
+            send_challenge_objective_email.delay(to_email=user.email, subject=subject, message=message)
+    except Exception as exc:
+        print(f"Failed to queue challenge email for {user.email}: {exc}")
+
 @celery_app.task(bind=True, max_retries=3)
 def process_mt5_feed(
     self,

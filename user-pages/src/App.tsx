@@ -101,6 +101,29 @@ function App() {
   useSession()
 
   useEffect(() => {
+    const path = window.location.pathname
+    if (path.startsWith('/ref/')) {
+      const code = path.split('/ref/')[1]?.split('/')[0]?.trim()
+      const backendUrl = import.meta.env.VITE_BACKEND_URL
+      if (!code) {
+        window.location.replace('/login')
+        return
+      }
+      if (!backendUrl) {
+        window.location.replace('/login')
+        return
+      }
+
+      fetch(`${backendUrl}/affiliate/click?affiliate_code=${encodeURIComponent(code)}`, { method: 'POST' })
+        .catch(() => {
+          // ignore tracking errors
+        })
+        .finally(() => {
+          window.location.replace('/login')
+        })
+      return
+    }
+
     const hasPersistedUser = Boolean(getPersistedAuthUser())
     if (!hasPersistedUser) return
 

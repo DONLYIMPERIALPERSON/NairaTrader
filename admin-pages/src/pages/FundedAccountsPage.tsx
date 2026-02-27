@@ -37,14 +37,15 @@ const FundedAccountsPage = ({ onOpenProfile }: FundedAccountsPageProps) => {
     void load()
   }, [])
 
-  const openProfileFromName = (name: string, revenue: string) => {
+  const openProfileFromRow = (row: ChallengeAccountListItem) => {
     onOpenProfile({
-      name,
-      email: `${name.toLowerCase().replace(/\s+/g, '.').replace(/[^a-z.]/g, '')}@mail.com`,
-      accounts: '1 / 1',
-      revenue,
-      orders: '5',
-      payouts: '₦280,000',
+      user_id: row.user_id,
+      name: row.trader_name ?? `User ${row.user_id}`,
+      email: row.trader_email ?? '',
+      accounts: '',
+      revenue: '',
+      orders: '',
+      payouts: '',
     })
   }
 
@@ -96,7 +97,7 @@ const FundedAccountsPage = ({ onOpenProfile }: FundedAccountsPageProps) => {
                 <td>{row.profit ?? '₦0'}</td>
                 <td>{row.win_rate ?? '0%'}</td>
                 <td>
-                  <button type="button" onClick={() => openProfileFromName(row.trader_name ?? `User ${row.user_id}`, row.profit ?? '₦0')}>
+                  <button type="button" onClick={() => openProfileFromRow(row)}>
                     View Profile
                   </button>
                 </td>
@@ -188,9 +189,9 @@ const FundedAccountsPage = ({ onOpenProfile }: FundedAccountsPageProps) => {
                   <td>{row.account_size}</td>
                   <td>{row.mt5_account ?? '-'}</td>
                   <td>{row.phase}</td>
-                  <td>+₦0 (dummy)</td>
+                  <td>{row.current_pnl ?? '₦0'}</td>
                   <td>
-                    <button type="button" onClick={() => openProfileFromName(row.trader_name ?? `User ${row.user_id}`, '+₦0 (dummy)')}>
+                    <button type="button" onClick={() => openProfileFromRow(row)}>
                       View Profile
                     </button>
                   </td>
