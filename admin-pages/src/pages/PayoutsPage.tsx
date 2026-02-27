@@ -24,6 +24,7 @@ const PayoutsPage = ({ onOpenProfile }: { onOpenProfile?: (user: AdminUser) => v
   const [payoutRequests, setPayoutRequests] = useState<PayoutRequest[]>([])
   const [stats, setStats] = useState<PayoutStats | null>(null)
   const [selectedPeriod, setSelectedPeriod] = useState<'today' | 'week' | 'month'>('today')
+  const [activeTab, setActiveTab] = useState<'requests' | 'history'>('requests')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [generatingCertificates, setGeneratingCertificates] = useState(false)
@@ -55,6 +56,37 @@ const PayoutsPage = ({ onOpenProfile }: { onOpenProfile?: (user: AdminUser) => v
 
   const handlePeriodChange = (period: 'today' | 'week' | 'month') => {
     setSelectedPeriod(period)
+  }
+
+  const requestRows = payoutRequests.filter((request) => request.status === 'pending_approval')
+  const historyRows = payoutRequests.filter((request) => request.status !== 'pending_approval')
+
+  const resolveApprovalInfo = (request: PayoutRequest) => {
+    const metadata = request.metadata || {}
+    const requiresAdmin = metadata.requires_admin_approval === true
+    const approvalType = requiresAdmin ? 'Manual' : 'Auto'
+    const approvedBy = metadata.approved_by || (requiresAdmin ? null : 'System')
+    const approvedAt = metadata.approved_at || null
+    const rejectedBy = metadata.rejected_by || null
+    const rejectedAt = metadata.rejected_at || null
+    const rejectionReason = metadata.rejection_reason || null
+
+    let decision = 'Pending'
+    if (rejectedBy) {
+      decision = `Rejected by ${rejectedBy}${rejectionReason ? ` (${rejectionReason})` : ''}`
+    } else if (approvedBy) {
+      decision = `Approved by ${approvedBy}`
+    } else if (!requiresAdmin) {
+      decision = 'Auto approved'
+    }
+
+    return {
+      approvalType,
+      approvedBy,
+      approvedAt,
+      rejectedAt,
+      decision,
+    }
   }
 
   const handleApprovePayout = async (payoutId: number) => {
@@ -165,8 +197,38 @@ const PayoutsPage = ({ onOpenProfile }: { onOpenProfile?: (user: AdminUser) => v
           </div>
         </div>
 
+        {/* Tab Selector */}
+        <div style={{ marginTop: '16px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          <button
+            onClick={() => setActiveTab('requests')}
+            style={{
+              padding: '8px 16px',
+              background: activeTab === 'requests' ? '#FFD700' : '#333',
+              color: activeTab === 'requests' ? '#000' : '#fff',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer'
+            }}
+          >
+            Requests ({requestRows.length})
+          </button>
+          <button
+            onClick={() => setActiveTab('history')}
+            style={{
+              padding: '8px 16px',
+              background: activeTab === 'history' ? '#FFD700' : '#333',
+              color: activeTab === 'history' ? '#000' : '#fff',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer'
+            }}
+          >
+            History ({historyRows.length})
+          </button>
+        </div>
+
         {/* Time Period Filter */}
-        <div style={{ marginTop: '16px', display: 'flex', gap: '8px' }}>
+        <div style={{ marginTop: '12px', display: 'flex', gap: '8px' }}>
           <button
             onClick={() => handlePeriodChange('today')}
             style={{
@@ -229,62 +291,65 @@ const PayoutsPage = ({ onOpenProfile }: { onOpenProfile?: (user: AdminUser) => v
       </div>
 
       <div className="admin-table-card">
-        <table className="admin-table">
-          <thead>
-            <tr>
-              <th>Request ID</th>
-              <th>User</th>
-              <th>Account</th>
-              <th>Amount</th>
-              <th>Status</th>
-              <th>Created</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {payoutRequests.map((request) => (
-              <tr key={request.id}>
-                <td>{request.provider_order_id}</td>
-                <td>
-                  <div>
-                    <div>{request.user.name}</div>
-                    <div style={{ fontSize: '12px', color: '#888' }}>{request.user.email}</div>
-                  </div>
-                </td>
-                <td>
-                  <div>
-                    <div>{request.account.account_size}</div>
-                    <div style={{ fontSize: '12px', color: '#888' }}>{request.account.challenge_id}</div>
-                  </div>
-                </td>
-                <td>{request.amount_formatted}</td>
-                <td>
-                  <span style={{
-                    padding: '4px 8px',
-                    borderRadius: '4px',
-                    fontSize: '12px',
-                    backgroundColor:
-                      request.status === 'pending_approval' ? '#FFA500' :
-                      request.status === 'processing' ? '#007BFF' :
-                      request.status === 'completed' ? '#28A745' :
-                      request.status === 'failed' ? '#DC3545' : '#6C757D',
-                    color: 'white'
-                  }}>
-                    {request.status.replace('_', ' ').toUpperCase()}
-                  </span>
-                </td>
-                <td>{new Date(request.created_at).toLocaleDateString()}</td>
-                <td>
-                  <div style={{ display: 'flex', gap: '4px', flexDirection: 'column' }}>
-                    <button
-                      type="button"
-                      className="payout-action-btn"
-                      onClick={() => handleViewUserProfile(request.user.id)}
-                      style={{ fontSize: '12px', padding: '4px 8px' }}
-                    >
-                      View Profile
-                    </button>
-                    {request.status === 'pending_approval' && (
+        {activeTab === 'requests' && (
+          <table className="admin-table">
+            <thead>
+              <tr>
+                <th>Request ID</th>
+                <th>User</th>
+                <th>Account</th>
+                <th>Amount</th>
+                <th>Status</th>
+                <th>Created</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {requestRows.length === 0 && (
+                <tr>
+                  <td colSpan={7} style={{ textAlign: 'center', padding: '16px' }}>
+                    No pending payout requests for this period.
+                  </td>
+                </tr>
+              )}
+              {requestRows.map((request) => (
+                <tr key={request.id}>
+                  <td>{request.provider_order_id}</td>
+                  <td>
+                    <div>
+                      <div>{request.user.name}</div>
+                      <div style={{ fontSize: '12px', color: '#888' }}>{request.user.email}</div>
+                    </div>
+                  </td>
+                  <td>
+                    <div>
+                      <div>{request.account.account_size}</div>
+                      <div style={{ fontSize: '12px', color: '#888' }}>{request.account.challenge_id}</div>
+                    </div>
+                  </td>
+                  <td>{request.amount_formatted}</td>
+                  <td>
+                    <span style={{
+                      padding: '4px 8px',
+                      borderRadius: '4px',
+                      fontSize: '12px',
+                      backgroundColor: '#FFA500',
+                      color: 'white'
+                    }}>
+                      PENDING APPROVAL
+                    </span>
+                  </td>
+                  <td>{new Date(request.created_at).toLocaleDateString()}</td>
+                  <td>
+                    <div style={{ display: 'flex', gap: '4px', flexDirection: 'column' }}>
+                      <button
+                        type="button"
+                        className="payout-action-btn"
+                        onClick={() => handleViewUserProfile(request.user.id)}
+                        style={{ fontSize: '12px', padding: '4px 8px' }}
+                      >
+                        View Profile
+                      </button>
                       <div style={{ display: 'flex', gap: '4px' }}>
                         <button
                           type="button"
@@ -303,13 +368,84 @@ const PayoutsPage = ({ onOpenProfile }: { onOpenProfile?: (user: AdminUser) => v
                           Reject
                         </button>
                       </div>
-                    )}
-                  </div>
-                </td>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+
+        {activeTab === 'history' && (
+          <table className="admin-table">
+            <thead>
+              <tr>
+                <th>Request ID</th>
+                <th>User</th>
+                <th>Amount</th>
+                <th>Approval</th>
+                <th>Decision</th>
+                <th>Status</th>
+                <th>Created</th>
+                <th>Completed</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {historyRows.length === 0 && (
+                <tr>
+                  <td colSpan={8} style={{ textAlign: 'center', padding: '16px' }}>
+                    No payout history for this period.
+                  </td>
+                </tr>
+              )}
+              {historyRows.map((request) => {
+                const approvalInfo = resolveApprovalInfo(request)
+                return (
+                  <tr key={request.id}>
+                    <td>{request.provider_order_id}</td>
+                    <td>
+                      <div>
+                        <div>{request.user.name}</div>
+                        <div style={{ fontSize: '12px', color: '#888' }}>{request.user.email}</div>
+                      </div>
+                    </td>
+                    <td>{request.amount_formatted}</td>
+                    <td>{approvalInfo.approvalType}</td>
+                    <td>
+                      <div>{approvalInfo.decision}</div>
+                      {approvalInfo.approvedAt && (
+                        <div style={{ fontSize: '12px', color: '#888' }}>
+                          Approved: {new Date(approvalInfo.approvedAt).toLocaleString()}
+                        </div>
+                      )}
+                      {approvalInfo.rejectedAt && (
+                        <div style={{ fontSize: '12px', color: '#888' }}>
+                          Rejected: {new Date(approvalInfo.rejectedAt).toLocaleString()}
+                        </div>
+                      )}
+                    </td>
+                    <td>
+                      <span style={{
+                        padding: '4px 8px',
+                        borderRadius: '4px',
+                        fontSize: '12px',
+                        backgroundColor:
+                          request.status === 'processing' ? '#007BFF' :
+                          request.status === 'completed' ? '#28A745' :
+                          request.status === 'failed' ? '#DC3545' : '#6C757D',
+                        color: 'white'
+                      }}>
+                        {request.status.replace('_', ' ').toUpperCase()}
+                      </span>
+                    </td>
+                    <td>{request.created_at ? new Date(request.created_at).toLocaleDateString() : '-'}</td>
+                    <td>{request.completed_at ? new Date(request.completed_at).toLocaleDateString() : '-'}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        )}
       </div>
     </section>
   )
