@@ -13,7 +13,7 @@ from app.models.payment_order import PaymentOrder
 from app.models.mt5_account import MT5Account
 from app.models.mt5_refresh_job import MT5RefreshJob, RefreshReason, RefreshStatus
 from app.models.user_pin import UserPin
-from app.services.challenge_objectives import compute_funded_payout_metrics, get_plan_for_account_size, _to_percent_number
+from app.services.challenge_objectives import compute_funded_payout_metrics, get_plan_for_account_size, _to_percent_number, compute_unrealized_pnl
 from app.services.palmpay_service import create_payout_order, query_payout_status
 from app.tasks import send_payout_notification
 from app.services.certificate_service import certificate_service
@@ -235,7 +235,7 @@ async def request_payout(
     if account.objective_status == "breached":
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Account has been breached and is not eligible for payout")
 
-    unrealized_pnl = account.unrealized_pnl or 0
+    unrealized_pnl = compute_unrealized_pnl(account)
     if abs(unrealized_pnl) > 0:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
