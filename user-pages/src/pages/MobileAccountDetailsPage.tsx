@@ -55,10 +55,12 @@ const MobileAccountDetailsPage: React.FC = () => {
   useEffect(() => {
     if (!lastRefreshTime || !accountData) return
 
+    const currentChallengeId = challengeId
+    if (!currentChallengeId) return
+
     const pollInterval = setInterval(async () => {
       try {
-        if (!challengeId) return
-        const data = await fetchUserChallengeAccountDetail(challengeId)
+        const data = await fetchUserChallengeAccountDetail(currentChallengeId)
         setAccountData(data)
 
         // Stop polling if last_feed_at is newer than refresh time
@@ -91,10 +93,10 @@ const MobileAccountDetailsPage: React.FC = () => {
     if (!accountData || !challengeId) return
 
     const currentChallengeId = challengeId
+    if (!currentChallengeId) return
     const autoUpdateInterval = setInterval(async () => {
       try {
-        if (!currentChallengeId) return
-        const data = await fetchUserChallengeAccountDetail(currentChallengeId!)
+        const data = await fetchUserChallengeAccountDetail(currentChallengeId)
 
         // Only update the metrics that change frequently (balance, equity, pnl, max loss)
         setAccountData(prevData => {
@@ -138,10 +140,12 @@ const MobileAccountDetailsPage: React.FC = () => {
 
   const handleRefresh = async () => {
     if (!challengeId || refreshing || refreshCooldown > 0) return
+    const currentChallengeId = challengeId
+    if (!currentChallengeId) return
 
     try {
       setRefreshing(true)
-      const result = await refreshChallengeAccount(challengeId)
+      const result = await refreshChallengeAccount(currentChallengeId)
 
       if (result.status === 'queued') {
         setLastRefreshTime(Date.now())
@@ -215,7 +219,7 @@ const MobileAccountDetailsPage: React.FC = () => {
               />
             </div>
             <div className="mobile-account-details-card mobile-account-details-card-spaced">
-              <MobileTradingObjective objectives={accountData.objectives} />
+              <MobileTradingObjective objectives={accountData.objectives} phase={accountData.phase} />
             </div>
           </>
         )

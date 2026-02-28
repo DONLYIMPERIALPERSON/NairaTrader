@@ -7,9 +7,10 @@ interface MobileTradingObjectiveProps {
     status: 'passed' | 'pending' | 'breached' | string
     note?: string | null
   }>
+  phase?: string
 }
 
-const MobileTradingObjective: React.FC<MobileTradingObjectiveProps> = ({ objectives }) => {
+const MobileTradingObjective: React.FC<MobileTradingObjectiveProps> = ({ objectives, phase }) => {
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'passed':
@@ -57,7 +58,9 @@ const MobileTradingObjective: React.FC<MobileTradingObjectiveProps> = ({ objecti
         <span className="text-small" style={{textTransform: 'uppercase', fontWeight: '600', color: 'rgba(255,255,255,0.6)'}}>Trading objective</span>
       </div>
       <div className="mobile-objectives-list">
-        {Object.entries(objectives).map(([key, objective]) => (
+        {Object.entries(objectives)
+          .filter(([key]) => !(phase === 'Funded' && key === 'profit_target'))
+          .map(([key, objective]) => (
           <div key={key} className="mobile-objective-row">
             <div className="mobile-objective-left">
               <span className="mobile-objective-icon">{getIconForObjective(key)}</span>

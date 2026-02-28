@@ -1,6 +1,7 @@
 from typing import List
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, status, Request
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.db.deps import get_db
@@ -82,10 +83,6 @@ async def get_payout_summary(
 
         total_available_payout += available_payout
 
-        # Calculate total earned (including withdrawn amounts)
-        total_earned = available_payout + (account.withdrawal_count * account.initial_balance * 0.1)  # Rough estimate
-        total_earned_all_time += total_earned
-
         account_payouts.append(FundedAccountPayout(
             account_id=account.id,
             challenge_id=account.challenge_id,
@@ -101,6 +98,16 @@ async def get_payout_summary(
 
     # Commit the updated payout metrics to the database
     db.commit()
+
+    # Sum completed/processing payout orders for true total earned
+    total_withdrawn_kobo = db.scalar(
+        db.query(func.sum(PaymentOrder.net_amount_kobo))
+        .filter(PaymentOrder.user_id == current_user.id)
+        .filter(PaymentOrder.provider == "palmpay_payout")
+        .filter(PaymentOrder.status.in_(["completed", "processing", "pending_approval"]))
+    )
+    total_withdrawn = (total_withdrawn_kobo or 0) / 100
+    total_earned_all_time = total_available_payout + total_withdrawn
 
     # Get withdrawal history
     withdrawal_history = db.query(PaymentOrder).filter(

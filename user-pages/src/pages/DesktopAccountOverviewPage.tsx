@@ -307,8 +307,10 @@ const DesktopAccountOverviewPage: React.FC = () => {
             <span className="trading-objective-title">Trading Objective</span>
           </div>
           <div className="objectives-list">
-            {Object.entries(accountData.objectives).map(([key, objective]) => (
-              <div key={key} className="objective-item">
+            {Object.entries(accountData.objectives)
+              .filter(([key]) => !(accountData.phase === 'Funded' && key === 'profit_target'))
+              .map(([key, objective]) => (
+                <div key={key} className="objective-item">
                 <div className="objective-content">
                   <i className={`fas fa-${key === 'max_drawdown' ? 'circle-exclamation' : key === 'profit_target' ? 'bullseye' : key === 'scalping_rule' ? 'hourglass-half' : 'calendar-days'} objective-icon ${key === 'max_drawdown' ? 'max-loss' : key === 'profit_target' ? 'profit-target' : key === 'scalping_rule' ? 'time-rule' : 'trading-days'}`}></i>
                   <div className="objective-text-section">
