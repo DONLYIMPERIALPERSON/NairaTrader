@@ -231,84 +231,16 @@ async def request_payout(
     if not verify_secret(request.pin, user_pin.pin_hash):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid transaction PIN")
 
-    # Get the active MT5 account for verification
-    mt5_account = db.get(MT5Account, account.active_mt5_account_id)
-    if not mt5_account:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No active MT5 account found")
+    # Withdrawal verification using latest stored data (no MT5 refresh job)
+    if account.objective_status == "breached":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Account has been breached and is not eligible for payout")
 
-    # Create withdrawal verification job (reuse active job if one exists)
-    now = datetime.now(timezone.utc)
-    verification_job = (
-        db.query(MT5RefreshJob)
-        .filter(MT5RefreshJob.account_number == mt5_account.account_number)
-        .filter(MT5RefreshJob.status.in_([RefreshStatus.queued, RefreshStatus.processing]))
-        .order_by(MT5RefreshJob.requested_at.desc())
-        .first()
-    )
-
-    if verification_job is None:
-        verification_job = MT5RefreshJob(
-            account_number=mt5_account.account_number,
-            reason=RefreshReason.withdrawal_verify,
-            status=RefreshStatus.queued,
-            requested_by_user_id=current_user.id,
-            requested_at=now,
-        )
-        db.add(verification_job)
-        db.flush()  # Get the job ID
-        db.commit()  # Make job visible to refresh engine
-
-    # Wait for verification (up to 60 seconds)
-    import time
-    timeout_seconds = 60
-    start_time = time.time()
-    last_feed_at_before = account.last_feed_at
-
-    while time.time() - start_time < timeout_seconds:
-        db.refresh(verification_job)  # Refresh job status from DB
-
-        if verification_job.status == RefreshStatus.done:
-            # Check if last_feed_at was updated after job started
-            db.refresh(account)
-            if account.last_feed_at and account.last_feed_at > verification_job.started_at:
-                logger.info(
-                    "withdrawal-verify: done (job_id=%s account_id=%s last_feed_at=%s started_at=%s)",
-                    verification_job.id,
-                    account.id,
-                    account.last_feed_at,
-                    verification_job.started_at,
-                )
-                break  # Fresh data available
-
-        if verification_job.status == RefreshStatus.failed:
-            logger.warning(
-                "withdrawal-verify: failed status (job_id=%s status=%s error=%s)",
-                verification_job.id,
-                verification_job.status,
-                verification_job.error,
-            )
-            break
-
-        time.sleep(2)  # Poll every 2 seconds
-
-    # Check if verification succeeded
-    if verification_job.status != RefreshStatus.done or not (account.last_feed_at and account.last_feed_at > verification_job.started_at):
-        # Keep failed job for diagnostics
-        logger.warning(
-            "withdrawal-verify: timeout or stale feed (job_id=%s status=%s last_feed_at=%s started_at=%s)",
-            verification_job.id,
-            verification_job.status,
-            account.last_feed_at,
-            verification_job.started_at,
-        )
-        db.commit()
+    unrealized_pnl = account.unrealized_pnl or 0
+    if abs(unrealized_pnl) > 0:
         raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Verification pending. Please try again in a few moments."
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Open trades detected. Please close all trades before requesting a payout."
         )
-
-    # Clean up successful verification job
-    db.delete(verification_job)
 
     # Now run withdrawal eligibility checks with fresh data
     # Ensure payout metrics are up to date with latest balance
