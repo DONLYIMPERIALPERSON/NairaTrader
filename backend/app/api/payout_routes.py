@@ -236,18 +236,27 @@ async def request_payout(
     if not mt5_account:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No active MT5 account found")
 
-    # Create withdrawal verification job
+    # Create withdrawal verification job (reuse active job if one exists)
     now = datetime.now(timezone.utc)
-    verification_job = MT5RefreshJob(
-        account_number=mt5_account.account_number,
-        reason=RefreshReason.withdrawal_verify,
-        status=RefreshStatus.queued,
-        requested_by_user_id=current_user.id,
-        requested_at=now,
+    verification_job = (
+        db.query(MT5RefreshJob)
+        .filter(MT5RefreshJob.account_number == mt5_account.account_number)
+        .filter(MT5RefreshJob.status.in_([RefreshStatus.queued, RefreshStatus.processing]))
+        .order_by(MT5RefreshJob.requested_at.desc())
+        .first()
     )
-    db.add(verification_job)
-    db.flush()  # Get the job ID
-    db.commit()  # Make job visible to refresh engine
+
+    if verification_job is None:
+        verification_job = MT5RefreshJob(
+            account_number=mt5_account.account_number,
+            reason=RefreshReason.withdrawal_verify,
+            status=RefreshStatus.queued,
+            requested_by_user_id=current_user.id,
+            requested_at=now,
+        )
+        db.add(verification_job)
+        db.flush()  # Get the job ID
+        db.commit()  # Make job visible to refresh engine
 
     # Wait for verification (up to 60 seconds)
     import time
