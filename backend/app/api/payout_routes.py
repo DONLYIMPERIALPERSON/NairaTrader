@@ -270,7 +270,7 @@ async def request_payout(
                 )
                 break  # Fresh data available
 
-        if verification_job.status in {RefreshStatus.failed, RefreshStatus.cancelled}:
+        if verification_job.status == RefreshStatus.failed:
             logger.warning(
                 "withdrawal-verify: failed status (job_id=%s status=%s error=%s)",
                 verification_job.id,
