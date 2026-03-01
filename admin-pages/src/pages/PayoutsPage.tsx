@@ -65,7 +65,12 @@ const PayoutsPage = ({ onOpenProfile }: { onOpenProfile?: (user: AdminUser) => v
     const metadata = request.metadata || {}
     const requiresAdmin = metadata.requires_admin_approval === true
     const approvalType = requiresAdmin ? 'Manual' : 'Auto'
-    const approvedBy = metadata.approved_by || (requiresAdmin ? null : 'System')
+    const approvedBy =
+      metadata.approved_by ||
+      metadata.approvedBy ||
+      metadata.approved_by_name ||
+      metadata.approved_by_admin ||
+      (requiresAdmin ? null : 'System')
     const approvedAt = metadata.approved_at || null
     const rejectedBy = metadata.rejected_by || null
     const rejectedAt = metadata.rejected_at || null
@@ -76,6 +81,8 @@ const PayoutsPage = ({ onOpenProfile }: { onOpenProfile?: (user: AdminUser) => v
       decision = `Rejected by ${rejectedBy}${rejectionReason ? ` (${rejectionReason})` : ''}`
     } else if (approvedBy) {
       decision = `Approved by ${approvedBy}`
+    } else if (requiresAdmin && ['processing', 'completed'].includes(request.status)) {
+      decision = 'Approved by Admin'
     } else if (!requiresAdmin) {
       decision = 'Auto approved'
     }
