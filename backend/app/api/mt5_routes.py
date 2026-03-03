@@ -57,12 +57,13 @@ def _auto_assign_pending_orders(db: Session) -> None:
     if not pending_orders:
         return
 
-    # Group orders by account size
+    # Group orders by normalized account size
     orders_by_size: dict[str, list[PaymentOrder]] = {}
     for order in pending_orders:
-        if order.account_size not in orders_by_size:
-            orders_by_size[order.account_size] = []
-        orders_by_size[order.account_size].append(order)
+        normalized_size = _normalize_account_size(order.account_size)
+        if normalized_size not in orders_by_size:
+            orders_by_size[normalized_size] = []
+        orders_by_size[normalized_size].append(order)
 
     # For each account size, find available ready accounts and assign them
     for account_size, orders in orders_by_size.items():
@@ -70,7 +71,7 @@ def _auto_assign_pending_orders(db: Session) -> None:
         ready_accounts = db.scalars(
             select(MT5Account).where(
                 MT5Account.status == "Ready",
-                MT5Account.account_size == account_size
+                MT5Account.account_size.in_([account_size, f"{account_size} Account"])
             ).order_by(MT5Account.id.asc())
         ).all()
 
@@ -92,14 +93,14 @@ def _auto_assign_pending_orders(db: Session) -> None:
             challenge = ChallengeAccount(
                 challenge_id=challenge_id,
                 user_id=user.id,
-                account_size=account.account_size,
+                account_size=_normalize_account_size(account.account_size),
                 current_stage="Phase 1",
                 phase1_mt5_account_id=account.id,
                 phase2_mt5_account_id=None,
                 funded_mt5_account_id=None,
                 active_mt5_account_id=account.id,
             )
-            initialize_challenge_stage_tracking(challenge, account_size=account.account_size)
+            initialize_challenge_stage_tracking(challenge, account_size=challenge.account_size)
             db.add(challenge)
             db.flush()
 
@@ -151,12 +152,13 @@ def _auto_assign_awaiting_challenges(db: Session) -> None:
     if not awaiting_challenges:
         return
 
-    # Group challenges by account size
+    # Group challenges by normalized account size
     challenges_by_size: dict[str, list[ChallengeAccount]] = {}
     for challenge in awaiting_challenges:
-        if challenge.account_size not in challenges_by_size:
-            challenges_by_size[challenge.account_size] = []
-        challenges_by_size[challenge.account_size].append(challenge)
+        normalized_size = _normalize_account_size(challenge.account_size)
+        if normalized_size not in challenges_by_size:
+            challenges_by_size[normalized_size] = []
+        challenges_by_size[normalized_size].append(challenge)
 
     # For each account size, find available ready accounts and assign them
     for account_size, challenges in challenges_by_size.items():
@@ -164,7 +166,7 @@ def _auto_assign_awaiting_challenges(db: Session) -> None:
         ready_accounts = db.scalars(
             select(MT5Account).where(
                 MT5Account.status == "Ready",
-                MT5Account.account_size == account_size
+                MT5Account.account_size.in_([account_size, f"{account_size} Account"])
             ).order_by(MT5Account.id.asc())
         ).all()
 
@@ -195,6 +197,7 @@ def _auto_assign_awaiting_challenges(db: Session) -> None:
             # Update challenge account
             challenge.current_stage = next_stage
             challenge.active_mt5_account_id = account.id
+            challenge.account_size = _normalize_account_size(challenge.account_size)
             if next_stage == "Phase 2":
                 challenge.phase2_mt5_account_id = account.id
             elif next_stage == "Funded":
@@ -218,7 +221,7 @@ def _auto_assign_awaiting_challenges(db: Session) -> None:
             challenge.objective_status = "active"
             challenge.passed_stage = None
             challenge.passed_at = None
-            initialize_challenge_stage_tracking(challenge, account_size=account.account_size)
+            initialize_challenge_stage_tracking(challenge, account_size=challenge.account_size)
             db.add(challenge)
 
             # Send stage progression email

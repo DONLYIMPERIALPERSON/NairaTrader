@@ -40,6 +40,10 @@ def _parse_naira_to_kobo(value: str) -> int:
     return int(round(float(cleaned) * 100))
 
 
+def _normalize_account_size(value: str) -> str:
+    return value.replace(" Account", "").strip()
+
+
 def _get_plan_by_id(db: Session, plan_id: str) -> dict[str, object] | None:
     row = db.scalar(select(ChallengeConfig).where(ChallengeConfig.config_key == CHALLENGE_CONFIG_KEY))
     if row is None or not isinstance(row.config_value, list):
@@ -189,7 +193,7 @@ def init_palmpay_bank_transfer(
     if not enabled or status_text != "Available":
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Account plan is not available")
 
-    account_size = str(plan.get("name") or "").strip()
+    account_size = _normalize_account_size(str(plan.get("name") or "").strip())
     gross_amount_kobo = _parse_naira_to_kobo(str(plan.get("price") or ""))
     if gross_amount_kobo <= 0:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid plan price")

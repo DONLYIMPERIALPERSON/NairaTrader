@@ -232,13 +232,12 @@ def _process_phase2_migration(
 ) -> None:
     """Process Phase 2 migration request."""
     # Find an available Phase 2 account of the same size
-    # Note: MT5 account sizes have " Account" suffix (e.g., "₦400k Account")
-    mt5_account_size = f"{request.account_size} Account"
+    mt5_account_size = request.account_size.strip()
     mt5_account = db.scalar(
         select(MT5Account)
         .where(
             MT5Account.status == "Ready",
-            MT5Account.account_size == mt5_account_size
+            MT5Account.account_size.in_([mt5_account_size, f"{mt5_account_size} Account"])
         )
         .order_by(MT5Account.id.asc())
     )
@@ -302,13 +301,12 @@ def _process_funded_migration(
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Withdrawal amount is required and must be greater than 0 for payout requests")
 
     # Find an available funded account of the same size
-    # Note: MT5 account sizes have " Account" suffix (e.g., "₦400k Account")
-    mt5_account_size = f"{request.account_size} Account"
+    mt5_account_size = request.account_size.strip()
     mt5_account = db.scalar(
         select(MT5Account)
         .where(
             MT5Account.status == "Ready",
-            MT5Account.account_size == mt5_account_size
+            MT5Account.account_size.in_([mt5_account_size, f"{mt5_account_size} Account"])
         )
         .order_by(MT5Account.id.asc())
     )
