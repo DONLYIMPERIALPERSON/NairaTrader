@@ -240,6 +240,7 @@ def _process_phase2_migration(
             MT5Account.account_size.in_([mt5_account_size, f"{mt5_account_size} Account"])
         )
         .order_by(MT5Account.id.asc())
+        .with_for_update(skip_locked=True)
     )
 
     if not mt5_account:
@@ -309,6 +310,7 @@ def _process_funded_migration(
             MT5Account.account_size.in_([mt5_account_size, f"{mt5_account_size} Account"])
         )
         .order_by(MT5Account.id.asc())
+        .with_for_update(skip_locked=True)
     )
 
     if not mt5_account:
