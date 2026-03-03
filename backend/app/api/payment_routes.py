@@ -92,6 +92,7 @@ def _assign_phase1_account_for_paid_order(db: Session, order: PaymentOrder) -> s
         select(MT5Account)
         .where(MT5Account.status == "Ready", MT5Account.account_size == order.account_size)
         .order_by(MT5Account.id.asc())
+        .with_for_update(skip_locked=True)
     )
     if mt5 is None:
         order.assignment_status = "awaiting_account"
