@@ -38,6 +38,7 @@ const MT5Page = () => {
   const [summary, setSummary] = useState({ total: 0, ready: 0, assigned: 0, disabled: 0 })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [readySearch, setReadySearch] = useState('')
   const [assignedSearch, setAssignedSearch] = useState('')
   const [deletingAccountId, setDeletingAccountId] = useState<number | null>(null)
 
@@ -100,6 +101,12 @@ const MT5Page = () => {
       return acc
     }, {})
   }, [readyAccounts])
+
+  const filteredReadyAccounts = useMemo(() => {
+    const query = readySearch.trim().toLowerCase()
+    if (!query) return readyAccounts
+    return readyAccounts.filter((account) => account.account_number.toLowerCase().includes(query))
+  }, [readyAccounts, readySearch])
 
   const filteredAssignedAccounts = useMemo(() => {
     const query = assignedSearch.trim().toLowerCase()
@@ -430,6 +437,26 @@ const MT5Page = () => {
           </div>
         )}
 
+        {activeTab === 'ready' && (
+          <div style={{ padding: '0 16px 12px' }}>
+            <input
+              type="search"
+              value={readySearch}
+              onChange={(event) => setReadySearch(event.target.value)}
+              placeholder="Search ready account number"
+              style={{
+                width: 'min(320px, 100%)',
+                borderRadius: 10,
+                border: '1px solid #2a2f3a',
+                background: '#0f131b',
+                color: '#e5e7eb',
+                padding: '8px 12px',
+                outline: 'none',
+              }}
+            />
+          </div>
+        )}
+
         {loading && <p style={{ color: '#9ca3af', padding: '0 16px 16px' }}>Loading MT5 inventory...</p>}
         {!loading && error && <p style={{ color: '#fca5a5', padding: '0 16px 16px' }}>{error}</p>}
 
@@ -448,7 +475,7 @@ const MT5Page = () => {
               </tr>
             </thead>
             <tbody>
-              {readyAccounts.map((account) => (
+              {filteredReadyAccounts.map((account) => (
                 <tr key={account.id}>
                   <td>{account.server}</td>
                   <td>{account.account_number}</td>
