@@ -108,14 +108,14 @@ async def get_payout_summary(
         plan = get_plan_for_account_size(db, account.account_size)
         profit_split_percent = _to_percent_number(plan.get("profit_split") if plan else "80", fallback=80)
 
-        # Calculate minimum withdrawal amount (10% of account size)
-        min_withdrawal_amount = account.initial_balance * 0.10
+        # Calculate minimum withdrawal amount (8% of account size)
+        min_withdrawal_amount = account.initial_balance * 0.08
 
         # Get the raw available payout
         raw_available_payout = account.funded_user_payout_amount or 0
 
         # Apply withdrawal limits:
-        # - Must be at least 10% of account size
+        # - Must be at least 8% of account size
         # - Cannot exceed the profit cap amount
         profit_cap_amount = account.funded_profit_cap_amount or 0
         available_payout = min(raw_available_payout, profit_cap_amount)
@@ -200,7 +200,7 @@ async def get_payout_summary(
 
     # Check minimum payout threshold
     minimum_payout_threshold = min(
-        (account.initial_balance * 0.10 for account in eligible_funded_accounts),
+        (account.initial_balance * 0.08 for account in eligible_funded_accounts),
         default=0,
     )
     if total_available_payout > 0 and minimum_payout_threshold > 0 and total_available_payout < minimum_payout_threshold:
@@ -340,7 +340,7 @@ async def request_payout(
 
     # Get available payout and limits
     available_payout = account.funded_user_payout_amount or 0
-    min_withdrawal_amount = account.initial_balance * 0.10
+    min_withdrawal_amount = account.initial_balance * 0.08
     profit_cap_amount = account.funded_profit_cap_amount or 0
 
     # Apply withdrawal limits
