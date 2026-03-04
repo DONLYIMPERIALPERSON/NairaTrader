@@ -133,7 +133,7 @@ def get_stage_elapsed_hours(challenge: ChallengeAccount, *, now: datetime | None
 def is_min_trading_days_met(db: Session, challenge: ChallengeAccount, *, now: datetime | None = None) -> tuple[float, float, bool]:
     required_days = get_min_trading_days_required(db, challenge.account_size)
     elapsed_hours = get_stage_elapsed_hours(challenge, now=now)
-    required_hours = 1
+    required_hours = 24
     return required_days, elapsed_hours, elapsed_hours >= required_hours
 
 
