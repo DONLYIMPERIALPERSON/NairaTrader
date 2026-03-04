@@ -69,10 +69,13 @@ def _auto_assign_pending_orders(db: Session) -> None:
     for account_size, orders in orders_by_size.items():
         # Find ready accounts of this size
         ready_accounts = db.scalars(
-            select(MT5Account).where(
+            select(MT5Account)
+            .where(
                 MT5Account.status == "Ready",
                 MT5Account.account_size.in_([account_size, f"{account_size} Account"])
-            ).order_by(MT5Account.id.asc())
+            )
+            .order_by(MT5Account.id.asc())
+            .with_for_update(skip_locked=True)
         ).all()
 
         if not ready_accounts:
