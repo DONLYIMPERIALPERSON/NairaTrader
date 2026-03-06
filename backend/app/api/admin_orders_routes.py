@@ -259,6 +259,18 @@ def query_pending_orders(
                 }
             )
             continue
+        except Exception as exc:
+            failed += 1
+            results.append(
+                {
+                    "order_id": order.id,
+                    "provider_order_id": order.provider_order_id,
+                    "status": order.status,
+                    "previous_status": previous_status,
+                    "error": f"Unexpected error: {exc}",
+                }
+            )
+            continue
 
         order.status = map_order_status(status_data.get("orderStatus"))
         order.provider_raw_response = status_data
