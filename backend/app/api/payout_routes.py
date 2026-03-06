@@ -1,5 +1,6 @@
 from typing import List
 from datetime import datetime, timedelta, timezone
+import time
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -301,9 +302,6 @@ async def request_payout(
     if account.current_stage != "Funded":
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Account is not in funded stage")
 
-    if account.objective_status == "breached":
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Account has been breached and is not eligible for payout")
-
     latest_withdrawal_at = _get_latest_withdrawal_time(db, current_user.id)
     cooldown_remaining = _get_withdrawal_cooldown_remaining(latest_withdrawal_at)
     if cooldown_remaining:
@@ -323,7 +321,50 @@ async def request_payout(
     if not verify_secret(request.pin, user_pin.pin_hash):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid transaction PIN")
 
-    # Withdrawal verification using latest stored data (no MT5 refresh job)
+    if not settings.mt5_vps_base_url or not settings.mt5_vps_secret:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="VPS refresh is not configured")
+
+    mt5 = db.get(MT5Account, account.active_mt5_account_id)
+    if not mt5:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No active MT5 account found for this challenge")
+
+    job = MT5RefreshJob(
+        account_number=mt5.account_number,
+        reason=RefreshReason.withdrawal_verify,
+        status=RefreshStatus.queued,
+        requested_by_user_id=current_user.id,
+        engine_id="withdrawal-verify",
+    )
+    db.add(job)
+    db.commit()
+    db.refresh(job)
+
+    run_mt5_refresh_job.delay(
+        job_id=job.id,
+        challenge_id=account.challenge_id,
+        account_number=mt5.account_number,
+        password=mt5.password,
+    )
+
+    deadline = time.time() + 180
+    refreshed_job = job
+    while time.time() < deadline:
+        refreshed_job = db.get(MT5RefreshJob, job.id)
+        if refreshed_job and refreshed_job.status in {RefreshStatus.done, RefreshStatus.failed}:
+            break
+        time.sleep(5)
+
+    if not refreshed_job or refreshed_job.status != RefreshStatus.done:
+        error_detail = refreshed_job.error if refreshed_job else "Refresh job not found"
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Unable to verify account before payout. {error_detail or 'Refresh timed out.'}",
+        )
+
+    account = db.get(ChallengeAccount, request.account_id)
+    if not account:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Account not found")
+
     if account.objective_status == "breached":
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Account has been breached and is not eligible for payout")
 
