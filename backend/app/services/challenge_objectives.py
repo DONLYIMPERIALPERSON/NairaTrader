@@ -267,13 +267,13 @@ def process_challenge_feed(
     challenge.breach_balance = challenge.highest_balance - challenge.dd_amount
     compute_funded_payout_metrics(db, challenge, balance)
 
-    if trades:
+    if scalping_breach_increment is not None:
+        fast_trade_count = scalping_breach_increment
+    elif trades:
         fast_trade_count = sum(
             1 for trade in trades
             if (trade.close_time - trade.open_time).total_seconds() < settings.challenge_scalping_min_seconds
         )
-    elif scalping_breach_increment is not None:
-        fast_trade_count = scalping_breach_increment
     else:
         fast_trade_count = sum(
             1 for duration in closed_trade_durations_seconds
